@@ -20,7 +20,7 @@ function LoginForm() {
   const [state, formAction, pending] = useActionState(loginAction, { error: null });
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-canvas px-4">
+    <div className="dark min-h-screen flex items-center justify-center bg-canvas px-4 font-sans">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
           <Image
