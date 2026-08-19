@@ -66,6 +66,28 @@ async function main() {
       },
     }),
     prisma.user.upsert({
+      where: { email: "zonasha@househeywood.com" },
+      update: { passwordHash: await bcrypt.hash("Momboss123", 10) },
+      create: {
+        organizationId: org.id,
+        email: "zonasha@househeywood.com",
+        passwordHash: await bcrypt.hash("Momboss123", 10),
+        name: "Zonasha Heywood",
+        role: "ADMIN",
+      },
+    }),
+    prisma.user.upsert({
+      where: { email: "james@househeywood.com" },
+      update: { passwordHash: await bcrypt.hash("Dudedad123", 10) },
+      create: {
+        organizationId: org.id,
+        email: "james@househeywood.com",
+        passwordHash: await bcrypt.hash("Dudedad123", 10),
+        name: "James Heywood",
+        role: "ADMIN",
+      },
+    }),
+    prisma.user.upsert({
       where: { email: "designer@stitchos.dev" },
       update: {},
       create: {
@@ -864,7 +886,7 @@ async function main() {
 
   console.log("Seed complete:", {
     org: org.name,
-    users: 4,
+    users: 6,
     threadColors: PALETTE_ORDER.length,
     machine: machine.name,
     products: 6,
