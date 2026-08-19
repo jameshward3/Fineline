@@ -3,8 +3,11 @@ import { PrismaClient } from "../app/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import { hexToLab, rgbString, hexToRgb } from "../lib/color";
+import { fileURLToPath } from "node:url";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+const adapter = new PrismaPg({
+  connectionString: process.env.fineline_POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL!,
+});
 const prisma = new PrismaClient({ adapter });
 
 const PALETTE_ORDER = [
@@ -45,7 +48,7 @@ const MACHINE_NEEDLE_ORDER = [
   "Purple",
 ];
 
-async function main() {
+export async function main() {
   const org = await prisma.organization.upsert({
     where: { id: "org_demo" },
     update: { name: "Fine Line Studio" },
@@ -897,12 +900,16 @@ async function main() {
   });
 }
 
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isDirectRun) {
+  main()
+    .then(async () => {
+      await prisma.$disconnect();
+    })
+    .catch(async (e) => {
+      console.error(e);
+      await prisma.$disconnect();
+      process.exit(1);
+    });
+}
