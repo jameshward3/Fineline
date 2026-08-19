@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --canvas: #0b0d10;
+  --surface: #111418;
+  --surface-raised: #171b21;
+  --surface-inset: #0a0c0f;
+  --border: #262b32;
+  --border-strong: #363c46;
+  --ink: #e7e9ec;
+  --ink-muted: #9aa1ac;
+  --ink-faint: #5c6470;
+
+  --accent: #c9a227;
+  --accent-muted: #3a2f14;
+  --accent-foreground: #1a1408;
+  --ivory: #f2ede1;
+
+  --status-success: #22c55e;
+  --status-warning: #f59e0b;
+  --status-danger: #ef4444;
+  --status-info: #38bdf8;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  color: var(--ink);
+  background: var(--canvas);
+  font-feature-settings: "tnum" 1, "cv11" 1;
+}
+
+::selection {
+  background: var(--accent-muted);
+  color: var(--ink);
+}
+
+/* Thin, unobtrusive scrollbars for production-tool density */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+  border-radius: 8px;
+  border: 2px solid var(--surface);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .canvas-checker {
+    background-image:
+      linear-gradient(45deg, #1c2027 25%, transparent 25%),
+      linear-gradient(-45deg, #1c2027 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1c2027 75%),
+      linear-gradient(-45deg, transparent 75%, #1c2027 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+  }
+}

@@ -1,0 +1,810 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Organizations, Users, Clients
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            User[]
+  clients          Client[]
+  designs          Design[]
+  threadColors     ThreadColor[]
+  manufacturers    ThreadManufacturer[]
+  companyPalette   CompanyPalette?
+  machines         Machine[]
+  products         Product[]
+  productionSetups ProductionSetup[]
+  jobs             Job[]
+  tags             Tag[]
+  opportunities    Opportunity[]
+}
+
+enum UserRole {
+  ADMIN
+  DESIGNER
+  OPERATOR
+  VIEWER
+}
+
+model User {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  email          String       @unique
+  passwordHash   String
+  name           String
+  role           UserRole     @default(DESIGNER)
+  active         Boolean      @default(true)
+  avatarUrl      String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  designVersionsCreated DesignVersion[] @relation("DesignVersionCreatedBy")
+  jobsCreated           Job[]           @relation("JobCreatedBy")
+  productionRuns        ProductionRun[] @relation("ProductionRunRecordedBy")
+  notes                 Note[]          @relation("NoteAuthor")
+  exports               Export[]        @relation("ExportCreatedBy")
+  accountsOwned         Client[]        @relation("ClientRelationshipOwner")
+}
+
+enum AccountType {
+  SCHOOL_EDUCATION
+  CORPORATE
+  HOSPITALITY
+  LUXURY_RESIDENTIAL
+  INTERIOR_DESIGNER
+  EVENT_WEDDING
+  RETAIL_BRAND
+  CLUB_MEMBERSHIP
+  NONPROFIT
+  INDIVIDUAL
+  FAMILY_HOUSEHOLD
+}
+
+model Client {
+  id                  String       @id @default(cuid())
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id])
+  name                String
+  contactName         String?
+  email               String?
+  phone               String?
+  notes               String?
+  accountType         AccountType  @default(INDIVIDUAL)
+  active              Boolean      @default(true)
+  leadSource          String?
+  referralSource      String?
+  relationshipOwnerId String?
+  relationshipOwner   User?        @relation("ClientRelationshipOwner", fields: [relationshipOwnerId], references: [id])
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  designs          Design[]
+  jobs             Job[]
+  contacts         Contact[]
+  programs         Program[]
+  opportunities    Opportunity[]
+  samples          Sample[]
+  monogramProfiles MonogramProfile[]
+}
+
+// ---------------------------------------------------------------------------
+// Tags (generic labels usable on Designs and Jobs)
+// ---------------------------------------------------------------------------
+
+model Tag {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  label          String
+  color          String       @default("#6B7280")
+
+  designs TagsOnDesigns[]
+  jobs    TagsOnJobs[]
+
+  @@unique([organizationId, label])
+}
+
+model TagsOnDesigns {
+  designId String
+  design   Design @relation(fields: [designId], references: [id], onDelete: Cascade)
+  tagId    String
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([designId, tagId])
+}
+
+model TagsOnJobs {
+  jobId String
+  job   Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  tagId String
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, tagId])
+}
+
+// ---------------------------------------------------------------------------
+// Designs, Versions, Artwork Assets, Vector Objects
+// ---------------------------------------------------------------------------
+
+model Design {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  clientId       String?
+  client         Client?      @relation(fields: [clientId], references: [id])
+  collection     String?
+  name           String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  versions            DesignVersion[]
+  productAssociations DesignProductSetup[]
+  tags                TagsOnDesigns[]
+  jobItems            JobItem[]
+  programItems        ProgramProduct[]
+
+  @@index([organizationId, name])
+}
+
+enum DesignVersionStatus {
+  DRAFT
+  COLOR_REVIEW
+  PRODUCTION_PREP
+  READY_FOR_INSTITCH
+  ARCHIVED
+}
+
+model DesignVersion {
+  id            String              @id @default(cuid())
+  designId      String
+  design        Design              @relation(fields: [designId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  status        DesignVersionStatus @default(DRAFT)
+  changeNotes   String?
+  createdById   String
+  createdBy     User                @relation("DesignVersionCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  // Physical size (canonical unit: inches)
+  widthInches  Float?
+  heightInches Float?
+  displayUnit  String  @default("in") // "in" | "mm"
+  aspectLocked Boolean @default(true)
+
+  // Color analysis
+  detectedColorCount Int?
+  targetColorCount   Int?
+
+  // Embroidery readiness score (0-100) + factor breakdown
+  readinessScore          Int?
+  readinessBreakdown      Json?
+  readinessClassification String? // Excellent / Good with simplification / Significant cleanup required / Poor candidate
+
+  sourceAssetId String?
+  sourceAsset   ArtworkAsset? @relation("VersionSourceAsset", fields: [sourceAssetId], references: [id])
+
+  assets              ArtworkAsset[]       @relation("VersionAssets")
+  colorMappings       DesignColorMapping[]
+  vectorObjects       VectorObject[]
+  productAssociations DesignProductSetup[]
+  jobItems            JobItem[]
+  exports             Export[]
+  productionRuns      ProductionRun[]
+  approvalRequests    ApprovalRequest[]
+
+  @@unique([designId, versionNumber])
+}
+
+enum ArtworkStage {
+  SOURCE
+  WORKING
+  PRODUCTION
+  EXPORT
+  FINAL_DIGITIZED
+}
+
+model ArtworkAsset {
+  id              String        @id @default(cuid())
+  designVersionId String
+  designVersion   DesignVersion @relation("VersionAssets", fields: [designVersionId], references: [id], onDelete: Cascade)
+  stage           ArtworkStage
+  storageKey      String
+  url             String
+  fileName        String
+  fileFormat      String
+  fileSizeBytes   Int
+  widthPx         Int?
+  heightPx        Int?
+  createdAt       DateTime      @default(now())
+
+  sourceForVersions DesignVersion[] @relation("VersionSourceAsset")
+
+  @@index([designVersionId, stage])
+}
+
+model DesignColorMapping {
+  id               String        @id @default(cuid())
+  designVersionId  String
+  designVersion    DesignVersion @relation(fields: [designVersionId], references: [id], onDelete: Cascade)
+  sequence         Int
+  artworkColorHex  String
+  mergedColorHexes String[]      @default([])
+  threadColorId    String?
+  threadColor      ThreadColor?  @relation(fields: [threadColorId], references: [id])
+  needleNumber     Int?
+  colorDeltaE      Float?
+
+  @@unique([designVersionId, sequence])
+}
+
+enum StitchType {
+  RUNNING_STITCH
+  SATIN_STITCH
+  TATAMI_FILL
+  APPLIQUE
+  MANUAL_REVIEW
+}
+
+model VectorObject {
+  id                     String        @id @default(cuid())
+  designVersionId        String
+  designVersion          DesignVersion @relation(fields: [designVersionId], references: [id], onDelete: Cascade)
+  name                   String
+  svgPath                String        @db.Text
+  threadColorId          String?
+  threadColor            ThreadColor?  @relation(fields: [threadColorId], references: [id])
+  stitchType             StitchType    @default(MANUAL_REVIEW)
+  stitchTypeAuto         StitchType?
+  stitchDirectionDegrees Float?
+  sequenceOrder          Int
+  areaSqMm               Float?
+  minDetailMm            Float?
+  visible                Boolean       @default(true)
+  locked                 Boolean       @default(false)
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  @@index([designVersionId, sequenceOrder])
+}
+
+// ---------------------------------------------------------------------------
+// Thread Library / Company Palette / Machines
+// ---------------------------------------------------------------------------
+
+model ThreadManufacturer {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+
+  threadColors ThreadColor[]
+
+  @@unique([organizationId, name])
+}
+
+enum ThreadWeight {
+  W12
+  W30
+  W40
+  W60
+  OTHER
+}
+
+model ThreadColor {
+  id                String             @id @default(cuid())
+  organizationId    String
+  organization      Organization       @relation(fields: [organizationId], references: [id])
+  manufacturerId    String
+  manufacturer      ThreadManufacturer @relation(fields: [manufacturerId], references: [id])
+  manufacturerCode  String
+  manufacturerName  String
+  companyName       String
+  rgb               String // "245,243,234"
+  hex               String // "#F5F3EA"
+  lab               Json? // { l, a, b }
+  threadType        String             @default("Polyester")
+  threadWeight      ThreadWeight       @default(W40)
+  material          String?
+  finish            String?
+  notes             String?
+  inventoryQuantity Int                @default(0)
+  active            Boolean            @default(true)
+  favorite          Boolean            @default(false)
+  spoolPhotoUrl     String?
+  dateAdded         DateTime           @default(now())
+
+  companyPaletteSlots CompanyPaletteSlot[]
+  needlesLoaded       MachineNeedle[]
+  colorMappings       DesignColorMapping[]
+  vectorObjects       VectorObject[]
+  programColors       ProgramThreadColor[]
+  monogramProfiles    MonogramProfile[]
+
+  @@unique([organizationId, manufacturerId, manufacturerCode])
+  @@index([organizationId, active])
+}
+
+model CompanyPalette {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String       @default("Standard Company Palette")
+  updatedAt      DateTime     @updatedAt
+
+  slots CompanyPaletteSlot[]
+}
+
+model CompanyPaletteSlot {
+  id               String         @id @default(cuid())
+  companyPaletteId String
+  companyPalette   CompanyPalette @relation(fields: [companyPaletteId], references: [id], onDelete: Cascade)
+  slotNumber       Int
+  threadColorId    String
+  threadColor      ThreadColor    @relation(fields: [threadColorId], references: [id])
+
+  @@unique([companyPaletteId, slotNumber])
+}
+
+model Machine {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  needleCount    Int          @default(15)
+  location       String?
+  active         Boolean      @default(true)
+
+  needles MachineNeedle[]
+  jobs    Job[]
+}
+
+model MachineNeedle {
+  id            String       @id @default(cuid())
+  machineId     String
+  machine       Machine      @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  needleNumber  Int
+  threadColorId String?
+  threadColor   ThreadColor? @relation(fields: [threadColorId], references: [id])
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([machineId, needleNumber])
+}
+
+// ---------------------------------------------------------------------------
+// Products, Embroidery Locations, Production Setups
+// ---------------------------------------------------------------------------
+
+model Product {
+  id              String       @id @default(cuid())
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  name            String
+  brand           String?
+  manufacturer    String?
+  sku             String?
+  category        String
+  material        String?
+  fabricWeight    String?
+  stretch         String?
+  availableColors String[]     @default([])
+  supplier        String?
+  supplierUrl     String?
+  cost            Float?
+  notes           String?
+  photoUrls       String[]     @default([])
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  locations           EmbroideryLocation[]
+  variants            ProductVariant[]
+  productionSetups    ProductionSetup[]
+  productAssociations DesignProductSetup[]
+  jobItems            JobItem[]
+  programItems        ProgramProduct[]
+
+  @@index([organizationId, category])
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  colorName String
+  colorHex  String?
+  sku       String?
+
+  jobItems JobItem[]
+}
+
+model EmbroideryLocation {
+  id                     String  @id @default(cuid())
+  productId              String
+  product                Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name                   String
+  maxWidthInches         Float
+  maxHeightInches        Float
+  standardWidthMinInches Float?
+  standardWidthMaxInches Float?
+  recommendedHoop        String?
+  recommendedStabilizer  String?
+  orientation            String?
+  placementNotes         String?
+
+  productionSetups    ProductionSetup[]
+  productAssociations DesignProductSetup[]
+  jobItems            JobItem[]
+  programItems        ProgramProduct[]
+}
+
+model ProductionSetup {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  name           String
+  productId      String?
+  product        Product?            @relation(fields: [productId], references: [id])
+  locationId     String?
+  location       EmbroideryLocation? @relation(fields: [locationId], references: [id])
+  hoop           String?
+  stabilizer     String?
+  topping        String?
+  needleSize     String?
+  threadWeight   String?
+  bobbin         String?
+  speedSpm       Int?
+  densityNotes   String?
+  notes          String?
+  isFavorite     Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  productAssociations DesignProductSetup[]
+  jobItems            JobItem[]
+  productionRuns      ProductionRun[]
+  programItems        ProgramProduct[]
+}
+
+model DesignProductSetup {
+  id              String              @id @default(cuid())
+  designId        String
+  design          Design              @relation(fields: [designId], references: [id], onDelete: Cascade)
+  designVersionId String
+  designVersion   DesignVersion       @relation(fields: [designVersionId], references: [id])
+  productId       String
+  product         Product             @relation(fields: [productId], references: [id])
+  locationId      String?
+  location        EmbroideryLocation? @relation(fields: [locationId], references: [id])
+  setupId         String?
+  setup           ProductionSetup?    @relation(fields: [setupId], references: [id])
+  createdAt       DateTime            @default(now())
+
+  @@unique([designId, productId, locationId])
+}
+
+// ---------------------------------------------------------------------------
+// Jobs / Orders
+// ---------------------------------------------------------------------------
+
+enum JobStatus {
+  ARTWORK_RECEIVED
+  ARTWORK_PROCESSING
+  COLOR_REVIEW
+  PRODUCTION_PREP
+  READY_FOR_INSTITCH
+  DIGITIZED
+  TEST_SEW
+  APPROVED
+  PRODUCTION
+  COMPLETE
+  ARCHIVED
+}
+
+model Job {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  jobNumber      String       @unique
+  clientId       String?
+  client         Client?      @relation(fields: [clientId], references: [id])
+  status         JobStatus    @default(ARTWORK_RECEIVED)
+  machineId      String?
+  machine        Machine?     @relation(fields: [machineId], references: [id])
+  estimatedValue Float?
+  createdById    String
+  createdBy      User         @relation("JobCreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  items          JobItem[]
+  tags           TagsOnJobs[]
+  exports        Export[]
+  productionRuns ProductionRun[]
+}
+
+model JobItem {
+  id               String              @id @default(cuid())
+  jobId            String
+  job              Job                 @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  designId         String
+  design           Design              @relation(fields: [designId], references: [id])
+  designVersionId  String
+  designVersion    DesignVersion       @relation(fields: [designVersionId], references: [id])
+  productId        String
+  product          Product             @relation(fields: [productId], references: [id])
+  productVariantId String?
+  productVariant   ProductVariant?     @relation(fields: [productVariantId], references: [id])
+  locationId       String?
+  location         EmbroideryLocation? @relation(fields: [locationId], references: [id])
+  setupId          String?
+  setup            ProductionSetup?    @relation(fields: [setupId], references: [id])
+  garmentColor     String?
+  quantity         Int                 @default(1)
+}
+
+// ---------------------------------------------------------------------------
+// Exports
+// ---------------------------------------------------------------------------
+
+enum ExportType {
+  SVG
+  PNG
+  JPEG
+  PDF_PRODUCTION_SHEET
+  JSON
+  MASTER_PACKAGE_ZIP
+}
+
+model Export {
+  id              String        @id @default(cuid())
+  designVersionId String
+  designVersion   DesignVersion @relation(fields: [designVersionId], references: [id], onDelete: Cascade)
+  jobId           String?
+  job             Job?          @relation(fields: [jobId], references: [id])
+  type            ExportType
+  storageKey      String
+  url             String
+  createdById     String
+  createdBy       User          @relation("ExportCreatedBy", fields: [createdById], references: [id])
+  createdAt       DateTime      @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Production Learning Loop
+// ---------------------------------------------------------------------------
+
+enum ProductionRunResult {
+  EXCELLENT
+  ACCEPTABLE
+  NEEDS_REVISION
+  FAILED
+}
+
+model ProductionRun {
+  id                  String              @id @default(cuid())
+  designVersionId     String
+  designVersion       DesignVersion       @relation(fields: [designVersionId], references: [id])
+  jobId               String?
+  job                 Job?                @relation(fields: [jobId], references: [id])
+  setupId             String?
+  setup               ProductionSetup?    @relation(fields: [setupId], references: [id])
+  result              ProductionRunResult
+  issues              String[]            @default([])
+  photoUrls           String[]            @default([])
+  notes               String?
+  stitchCountEstimate Int?
+  recordedById        String
+  recordedBy          User                @relation("ProductionRunRecordedBy", fields: [recordedById], references: [id])
+  recordedAt          DateTime            @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Notes (lightweight polymorphic notes)
+// ---------------------------------------------------------------------------
+
+enum NoteEntityType {
+  DESIGN
+  JOB
+  PRODUCT
+  PRODUCTION_RUN
+  CLIENT
+}
+
+model Note {
+  id         String         @id @default(cuid())
+  entityType NoteEntityType
+  entityId   String
+  authorId   String
+  author     User           @relation("NoteAuthor", fields: [authorId], references: [id])
+  body       String
+  createdAt  DateTime       @default(now())
+
+  @@index([entityType, entityId])
+}
+
+// ---------------------------------------------------------------------------
+// Customer Approval (architecture stub for future customer portal)
+// ---------------------------------------------------------------------------
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  CHANGES_REQUESTED
+}
+
+model ApprovalRequest {
+  id              String         @id @default(cuid())
+  designVersionId String
+  designVersion   DesignVersion  @relation(fields: [designVersionId], references: [id], onDelete: Cascade)
+  token           String         @unique
+  status          ApprovalStatus @default(PENDING)
+  lockedRevision  Int?
+  createdAt       DateTime       @default(now())
+  respondedAt     DateTime?
+}
+
+// ---------------------------------------------------------------------------
+// CRM — Accounts (Client), Contacts, Programs, Opportunities, Samples,
+// Monogram Profiles. Fine Line Studio's institutional memory: the studio's
+// record of how each relationship likes its embroidery made, so a reorder
+// never means re-deriving specifications from scratch.
+// ---------------------------------------------------------------------------
+
+enum ContactRole {
+  PRIMARY
+  PURCHASING
+  ACCOUNTS_PAYABLE
+  CREATIVE_BRAND
+  EXECUTIVE_SPONSOR
+  DEPARTMENT_HEAD
+  OTHER
+}
+
+model Contact {
+  id                     String      @id @default(cuid())
+  clientId               String
+  client                 Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name                   String
+  role                   ContactRole @default(OTHER)
+  title                  String?
+  email                  String?
+  phone                  String?
+  department             String?
+  preferredContactMethod String?
+  preferredContactTime   String?
+  notes                  String?
+  createdAt              DateTime    @default(now())
+}
+
+enum ProgramStatus {
+  PLANNING
+  ACTIVE
+  INACTIVE
+}
+
+/// A Program is a repeatable embroidery relationship — the account's
+/// approved products, artwork, placements, and thread palette — so a
+/// reorder only needs quantity, sizes, and shipping to change.
+model Program {
+  id          String        @id @default(cuid())
+  clientId    String
+  client      Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  status      ProgramStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  approvedItems ProgramProduct[]
+  threadPalette ProgramThreadColor[]
+  opportunities Opportunity[]
+  samples       Sample[]
+}
+
+/// One approved product + placement + artwork + setup combination within a
+/// Program — the unit a "Reorder" action replays.
+model ProgramProduct {
+  id         String              @id @default(cuid())
+  programId  String
+  program    Program             @relation(fields: [programId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product             @relation(fields: [productId], references: [id])
+  locationId String?
+  location   EmbroideryLocation? @relation(fields: [locationId], references: [id])
+  designId   String?
+  design     Design?             @relation(fields: [designId], references: [id])
+  setupId    String?
+  setup      ProductionSetup?    @relation(fields: [setupId], references: [id])
+  notes      String?
+  createdAt  DateTime            @default(now())
+}
+
+model ProgramThreadColor {
+  id            String      @id @default(cuid())
+  programId     String
+  program       Program     @relation(fields: [programId], references: [id], onDelete: Cascade)
+  threadColorId String
+  threadColor   ThreadColor @relation(fields: [threadColorId], references: [id])
+  roleLabel     String? // e.g. "Primary", "Accent"
+
+  @@unique([programId, threadColorId])
+}
+
+enum OpportunityStage {
+  INQUIRY
+  CONSULTATION
+  SAMPLING
+  QUOTE
+  APPROVAL
+  PROGRAM_ESTABLISHED
+  ORDER
+}
+
+model Opportunity {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  clientId       String
+  client         Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  programId      String?
+  program        Program?         @relation(fields: [programId], references: [id])
+  name           String
+  potentialValue Float?
+  stage          OpportunityStage @default(INQUIRY)
+  nextAction     String?
+  nextActionDate DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+enum SampleStatus {
+  REQUESTED
+  DELIVERED
+  APPROVED
+  REJECTED
+}
+
+model Sample {
+  id         String       @id @default(cuid())
+  clientId   String
+  client     Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  programId  String?
+  program    Program?     @relation(fields: [programId], references: [id])
+  name       String
+  status     SampleStatus @default(REQUESTED)
+  notes      String?
+  photoUrls  String[]     @default([])
+  createdAt  DateTime     @default(now())
+  approvedAt DateTime?
+}
+
+/// A reusable personal monogram specification for individual/household
+/// clients — the "bespoke monogram house" record.
+model MonogramProfile {
+  id                  String       @id @default(cuid())
+  clientId            String
+  client              Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  personName          String
+  monogramText        String
+  style               String?
+  arrangement         String?
+  threadColorId       String?
+  threadColor         ThreadColor? @relation(fields: [threadColorId], references: [id])
+  preferredSizeInches Float?
+  savedApplications   String[]     @default([])
+  notes               String?
+  createdAt           DateTime     @default(now())
+}
