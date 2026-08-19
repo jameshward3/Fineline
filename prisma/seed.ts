@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const adapter = new PrismaPg({
   connectionString: process.env.fineline_POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL!,
+  ssl: { rejectUnauthorized: false },
 });
 const prisma = new PrismaClient({ adapter });
 
