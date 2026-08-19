@@ -9,10 +9,8 @@ export default auth((req) => {
   const isLoginPage = req.nextUrl.pathname === "/login";
   const isApiAuth = req.nextUrl.pathname.startsWith("/api/auth");
   const isPublicAsset = req.nextUrl.pathname.startsWith("/branding");
-  // Token-gated internally; see app/api/internal/seed-once/route.ts.
-  const isSeedOnce = req.nextUrl.pathname === "/api/internal/seed-once";
 
-  if (isApiAuth || isPublicAsset || isSeedOnce) return NextResponse.next();
+  if (isApiAuth || isPublicAsset) return NextResponse.next();
 
   if (!isLoggedIn && !isLoginPage) {
     const loginUrl = new URL("/login", req.nextUrl);
