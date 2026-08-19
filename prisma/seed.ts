@@ -5,8 +5,19 @@ import bcrypt from "bcryptjs";
 import { hexToLab, rgbString, hexToRgb } from "../lib/color";
 import { fileURLToPath } from "node:url";
 
+// pg-connection-string treats sslmode=require as an alias for verify-full,
+// which rejects Supabase's certificate chain. uselibpqcompat=true restores
+// the classic libpq semantics (encrypt without strict CA verification).
+function withLibpqCompat(connectionString: string) {
+  const url = new URL(connectionString);
+  url.searchParams.set("uselibpqcompat", "true");
+  return url.toString();
+}
+
 const adapter = new PrismaPg({
-  connectionString: process.env.fineline_POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL!,
+  connectionString: withLibpqCompat(
+    process.env.fineline_POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL!
+  ),
   ssl: { rejectUnauthorized: false },
 });
 const prisma = new PrismaClient({ adapter });
