@@ -117,6 +117,7 @@ function toPortalOrder(job: NonNullable<PortalJob>) {
     heightInches: configuration?.heightInches ?? item?.designVersion.heightInches ?? 0,
     threadWeight: configuration?.threadWeight ?? "W40",
     densityMm: configuration?.densityMm ?? 0.45,
+    stitchStyle: configuration?.stitchStyle ?? "PATCH",
     borderStyle: configuration?.border.style ?? "NONE",
     notes: configuration?.notes ?? submission?.customerMessage ?? "",
     artworkUrl,

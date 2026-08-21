@@ -724,6 +724,10 @@
   gap: 6px;
 }
 
+.constructionGroup {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .choiceGroup legend,
 .borderGroup legend,
 .projectTypes legend {

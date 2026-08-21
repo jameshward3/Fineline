@@ -275,7 +275,7 @@ export async function createConfiguratorSubmission(data: ConfiguratorSubmissionI
       `Placement: ${data.configuration.placementName}`,
       `Size: ${data.configuration.widthInches.toFixed(2)} × ${data.configuration.heightInches.toFixed(2)} in`,
       `Quantity: ${data.configuration.quantity}`,
-      `Thread: ${data.configuration.threadWeight}; density ${data.configuration.densityMm.toFixed(2)} mm`,
+      `Thread: ${data.configuration.threadWeight}; ${data.configuration.stitchStyle}; density ${data.configuration.densityMm.toFixed(2)} mm`,
       `Colors: ${data.configuration.colors.map((color) => `${color.threadName} (${color.targetHex})`).join(", ")}`,
       `Border: ${data.configuration.border.style}`,
       `Estimate: $${quote.total.toFixed(2)} (${quote.version}; studio confirmation required)`,

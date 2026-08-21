@@ -38,6 +38,7 @@ import {
 } from "@/lib/configurator/catalog";
 import { createThreadTextureMaps, prepareArtworkBuffer, type ThreadTextureMaps } from "@/lib/configurator/artwork-texture";
 import { calculateConfiguratorQuote, type BorderStyle, type ThreadWeightChoice } from "@/lib/configurator/pricing";
+import { STITCH_STYLES, stitchStyleLabel, type StitchStyle } from "@/lib/configurator/stitch-simulation";
 import type { ConfiguratorThreadMapping } from "@/lib/configurator/schema";
 import type { ConfiguratorUploadIntent } from "@/lib/configurator/upload-intent";
 import styles from "./embroidery-configurator.module.css";
@@ -49,6 +50,13 @@ const EmbroideryPreview3D = dynamic(
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"] as const;
 const STEPS = ["Product, quantity & artwork", "Thread & finish", "Size & placement", "Review & submit"] as const;
+const STITCH_STYLE_COPY: Record<StitchStyle, string> = {
+  AUTO: "Adapts to each shape",
+  PATCH: "Layered badge depth",
+  SATIN: "Long, glossy columns",
+  TATAMI: "Compact woven fill",
+};
+const EMPTY_STITCH_LAYERS: ThreadTextureMaps["stitchLayers"] = [];
 
 interface ArtworkState {
   file: File;
@@ -117,6 +125,13 @@ function safeArtworkName(fileName: string) {
   return normalized.replace(/^-+|-+$/g, "").slice(-180) || "artwork.png";
 }
 
+function hasTransparentPixels(buffer: PixelBuffer) {
+  for (let offset = 3; offset < buffer.data.length; offset += 4) {
+    if (buffer.data[offset] < 245) return true;
+  }
+  return false;
+}
+
 function productFor(catalog: ConfiguratorCatalog, key: string): PublicProduct {
   return catalog.products.find((product) => catalogKey(product) === key) ?? catalog.products[0];
 }
@@ -128,6 +143,7 @@ function money(value: number) {
 export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryConfiguratorProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const autoPalettePendingRef = useRef(false);
   const startedAtRef = useRef(Date.now());
   const idempotencyRef = useRef(
     typeof globalThis.crypto?.randomUUID === "function"
@@ -147,6 +163,7 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
   const [designName, setDesignName] = useState("");
   const [threadWeight, setThreadWeight] = useState<ThreadWeightChoice>("W40");
   const [densityMm, setDensityMm] = useState(0.45);
+  const [stitchStyle, setStitchStyle] = useState<StitchStyle>("PATCH");
   const [borderStyle, setBorderStyle] = useState<BorderStyle>("NONE");
   const [borderColor, setBorderColor] = useState("#1A1A1A");
   const [borderWidthMm, setBorderWidthMm] = useState(2);
@@ -209,6 +226,14 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
       const preparedBuffer = prepareArtworkBuffer(artwork.buffer, removeLightBackground);
       const next = quantizeColors(preparedBuffer, targetColorCount, { maxSamples: 12_000, iterations: 10 });
       if (cancelled) return;
+      if (autoPalettePendingRef.current) {
+        autoPalettePendingRef.current = false;
+        const smallestCoverage = Math.min(...next.palette.map((entry) => entry.coverage));
+        if (targetColorCount === 4 && next.palette.length === 4 && smallestCoverage < 0.075) {
+          setTargetColorCount(3);
+          return;
+        }
+      }
       setQuantized({ ...next, preparedBuffer });
       setMappings(mappingsFor(next.palette, catalog.threads));
       setProcessing(false);
@@ -234,10 +259,11 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
         borderWidthMm,
         densityMm,
         threadWeight,
+        stitchStyle,
       }));
     }, 24);
     return () => window.clearTimeout(timer);
-  }, [borderColor, borderStyle, borderWidthMm, densityMm, mappings, quantized, threadWeight]);
+  }, [borderColor, borderStyle, borderWidthMm, densityMm, mappings, quantized, stitchStyle, threadWeight]);
 
   const quote = useMemo(() => calculateConfiguratorQuote({
     widthInches,
@@ -287,11 +313,14 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
     setProcessing(true);
     try {
       const loaded = await loadImageFile(file);
-      const prepared = prepareArtworkBuffer(loaded.buffer, true);
+      const shouldRemoveLightBackground = !hasTransparentPixels(loaded.buffer);
+      const prepared = prepareArtworkBuffer(loaded.buffer, shouldRemoveLightBackground);
       const analysis = analyzeColors(prepared, { step: 18 });
       const recommended = Math.max(1, Math.min(6, analysis.detectedColorCount <= 3 ? analysis.detectedColorCount : 4));
       setDetectedColorCount(analysis.detectedColorCount);
+      autoPalettePendingRef.current = true;
       setTargetColorCount(recommended);
+      setRemoveLightBackground(shouldRemoveLightBackground);
       setArtwork({ file, ...loaded });
       setDesignName(file.name.replace(/\.[^.]+$/, ""));
       const aspect = loaded.naturalWidth / loaded.naturalHeight;
@@ -413,6 +442,7 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
             rotationDegrees,
             threadWeight,
             densityMm,
+            stitchStyle,
             colors: mappings,
             border: { style: borderStyle, colorHex: borderColor, widthMm: borderWidthMm },
             quantity,
@@ -613,6 +643,14 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
                   <small><span>Dense</span><span>Open</span></small>
                 </label>
               </div>
+              <fieldset className={`${styles.choiceGroup} ${styles.constructionGroup}`}>
+                <legend>Stitch construction</legend>
+                {STITCH_STYLES.map((style) => (
+                  <button key={style} type="button" className={stitchStyle === style ? styles.choiceSelected : ""} onClick={() => setStitchStyle(style)} aria-pressed={stitchStyle === style}>
+                    <strong>{stitchStyleLabel(style)}</strong><small>{STITCH_STYLE_COPY[style]}</small>
+                  </button>
+                ))}
+              </fieldset>
               <fieldset className={styles.borderGroup}>
                 <legend>Edge finish</legend>
                 {(["NONE", "SATIN", "MERROW"] as BorderStyle[]).map((style) => (
@@ -699,6 +737,8 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
               <EmbroideryPreview3D
                 textureUrl={textureMaps?.colorUrl ?? null}
                 heightTextureUrl={textureMaps?.heightUrl ?? null}
+                normalTextureUrl={textureMaps?.normalUrl ?? null}
+                stitchLayers={textureMaps?.stitchLayers ?? EMPTY_STITCH_LAYERS}
                 garmentColor={garmentColor}
                 productCategory={product.category}
                 widthInches={widthInches}
@@ -724,7 +764,7 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
               <div><span>Object</span><strong>{product.name}</strong></div>
               <div><span>Placement</span><strong>{placement.name}</strong></div>
               <div><span>Finished size</span><strong>{widthInches.toFixed(2)} × {heightInches.toFixed(2)} in</strong></div>
-              <div><span>Thread</span><strong>{threadWeight.replace("W", "")} wt · {mappings.length || targetColorCount} colors</strong></div>
+              <div><span>Thread construction</span><strong title={`${stitchStyleLabel(stitchStyle)} · ${threadWeight.replace("W", "")} wt · ${mappings.length || targetColorCount} colors`}>{stitchStyleLabel(stitchStyle)} · {threadWeight.replace("W", "")} wt · {mappings.length || targetColorCount} colors</strong></div>
             </div>
           </div>
           <div className={styles.quoteCard}>

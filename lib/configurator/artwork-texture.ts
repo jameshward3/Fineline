@@ -1,10 +1,110 @@
 import { hexToRgb } from "@/lib/color";
 import type { PixelBuffer } from "@/lib/services/image-processing/types";
 import type { BorderStyle, ThreadWeightChoice } from "./pricing";
+import {
+  createStitchSimulation,
+  STITCH_SEGMENT_STRIDE,
+  type StitchLayer,
+  type StitchStyle,
+} from "./stitch-simulation";
 
 export interface ThreadTextureMaps {
   colorUrl: string;
   heightUrl: string;
+  normalUrl: string;
+  stitchLayers: StitchLayer[];
+}
+
+function pathForLayer(layer: StitchLayer, width: number, height: number) {
+  const path = new Path2D();
+  let totalWidth = 0;
+  let count = 0;
+  for (let offset = 0; offset < layer.segments.length; offset += STITCH_SEGMENT_STRIDE) {
+    const centerX = (layer.segments[offset] + 0.5) * width;
+    const centerY = (0.5 - layer.segments[offset + 1]) * height;
+    const vectorX = layer.segments[offset + 2] * width;
+    const vectorY = -layer.segments[offset + 3] * height;
+    path.moveTo(centerX - vectorX / 2, centerY - vectorY / 2);
+    path.lineTo(centerX + vectorX / 2, centerY + vectorY / 2);
+    totalWidth += layer.segments[offset + 4] * width;
+    count++;
+  }
+  return { path, averageWidth: count ? totalWidth / count : 1 };
+}
+
+function drawThreadLayer(context: CanvasRenderingContext2D, layer: StitchLayer, width: number, height: number) {
+  const { path, averageWidth } = pathForLayer(layer, width, height);
+  const color = hexToRgb(layer.colorHex);
+  context.save();
+  context.lineCap = "round";
+  context.lineJoin = "round";
+
+  context.translate(0.55, 0.7);
+  context.globalAlpha = 0.42;
+  context.lineWidth = averageWidth * 1.55;
+  context.strokeStyle = `rgb(${Math.round(color.r * 0.34)} ${Math.round(color.g * 0.34)} ${Math.round(color.b * 0.34)})`;
+  context.stroke(path);
+
+  context.translate(-0.55, -0.7);
+  context.globalAlpha = 1;
+  context.lineWidth = averageWidth * 1.12;
+  context.strokeStyle = layer.colorHex;
+  context.stroke(path);
+
+  context.translate(-0.32, -0.38);
+  context.globalAlpha = 0.48;
+  context.lineWidth = Math.max(0.34, averageWidth * 0.24);
+  context.strokeStyle = "#FFF8E9";
+  context.stroke(path);
+  context.restore();
+}
+
+function drawHeightLayer(context: CanvasRenderingContext2D, layer: StitchLayer, width: number, height: number) {
+  const { path, averageWidth } = pathForLayer(layer, width, height);
+  context.save();
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.lineWidth = averageWidth * 1.7;
+  context.strokeStyle = "#B8B8B8";
+  context.stroke(path);
+  context.lineWidth = averageWidth * 0.72;
+  context.strokeStyle = "#FFFFFF";
+  context.stroke(path);
+  context.restore();
+}
+
+function createNormalMap(heightCanvas: HTMLCanvasElement) {
+  const context = heightCanvas.getContext("2d")!;
+  const source = context.getImageData(0, 0, heightCanvas.width, heightCanvas.height);
+  const output = new ImageData(heightCanvas.width, heightCanvas.height);
+  const sourceData = source.data;
+  const outputData = output.data;
+  const luminance = (x: number, y: number) => {
+    const sampleX = Math.min(heightCanvas.width - 1, Math.max(0, x));
+    const sampleY = Math.min(heightCanvas.height - 1, Math.max(0, y));
+    const offset = (sampleY * heightCanvas.width + sampleX) * 4;
+    return sourceData[offset] / 255;
+  };
+  const strength = 4.8;
+
+  for (let y = 0; y < heightCanvas.height; y++) {
+    for (let x = 0; x < heightCanvas.width; x++) {
+      const normalX = (luminance(x - 1, y) - luminance(x + 1, y)) * strength;
+      const normalY = (luminance(x, y - 1) - luminance(x, y + 1)) * strength;
+      const inverseLength = 1 / Math.hypot(normalX, normalY, 1);
+      const offset = (y * heightCanvas.width + x) * 4;
+      outputData[offset] = Math.round((normalX * inverseLength * 0.5 + 0.5) * 255);
+      outputData[offset + 1] = Math.round((normalY * inverseLength * 0.5 + 0.5) * 255);
+      outputData[offset + 2] = Math.round((inverseLength * 0.5 + 0.5) * 255);
+      outputData[offset + 3] = 255;
+    }
+  }
+
+  const normalCanvas = document.createElement("canvas");
+  normalCanvas.width = heightCanvas.width;
+  normalCanvas.height = heightCanvas.height;
+  normalCanvas.getContext("2d")!.putImageData(output, 0, 0);
+  return normalCanvas;
 }
 
 export function prepareArtworkBuffer(source: PixelBuffer, removeLightBackground: boolean): PixelBuffer {
@@ -28,6 +128,7 @@ export function createThreadTextureMaps({
   borderWidthMm,
   densityMm,
   threadWeight,
+  stitchStyle,
 }: {
   buffer: PixelBuffer;
   clusters: Int16Array;
@@ -37,6 +138,7 @@ export function createThreadTextureMaps({
   borderWidthMm: number;
   densityMm: number;
   threadWeight: ThreadWeightChoice;
+  stitchStyle: StitchStyle;
 }): ThreadTextureMaps {
   const recolored = new Uint8ClampedArray(buffer.data);
   const palette = targetHexes.map(hexToRgb);
@@ -87,61 +189,44 @@ export function createThreadTextureMaps({
   }
 
   context.drawImage(sourceCanvas, padding, padding, drawingWidth, drawingHeight);
-  context.globalCompositeOperation = "source-atop";
-  const spacing = Math.max(3, Math.round(3 + densityMm * 8));
-  const lineWidth = threadWeight === "W30" ? 1.45 : threadWeight === "W60" ? 0.7 : 1;
-  context.lineWidth = lineWidth;
-  context.strokeStyle = "rgba(255,255,255,0.23)";
-  for (let x = -canvas.height; x < canvas.width + canvas.height; x += spacing) {
-    context.beginPath();
-    context.moveTo(x, 0);
-    context.lineTo(x + canvas.height, canvas.height);
-    context.stroke();
-  }
-  context.strokeStyle = "rgba(22,18,15,0.12)";
-  for (let x = -canvas.height + spacing / 2; x < canvas.width + canvas.height; x += spacing) {
-    context.beginPath();
-    context.moveTo(x, 0);
-    context.lineTo(x + canvas.height, canvas.height);
-    context.stroke();
-  }
-  context.globalCompositeOperation = "source-over";
+  const stitchLayers = createStitchSimulation({
+    sourceWidth: buffer.width,
+    sourceHeight: buffer.height,
+    sourceClusters: clusters,
+    targetHexes,
+    outputWidth: canvas.width,
+    outputHeight: canvas.height,
+    contentX: padding,
+    contentY: padding,
+    contentWidth: drawingWidth,
+    contentHeight: drawingHeight,
+    densityMm,
+    threadWeight,
+    stitchStyle,
+    borderStyle,
+    borderColor,
+    borderWidthMm,
+  });
+  for (const layer of stitchLayers) drawThreadLayer(context, layer, canvas.width, canvas.height);
 
-  // A dedicated grayscale height map gives the WebGL material actual stitch
-  // relief instead of treating the colored artwork as a shallow bump map.
+  // The height and tangent-space normal maps remain useful at wide zooms;
+  // close zooms additionally render every generated strand as geometry.
   const heightCanvas = document.createElement("canvas");
   heightCanvas.width = canvas.width;
   heightCanvas.height = canvas.height;
   const heightContext = heightCanvas.getContext("2d")!;
   heightContext.drawImage(canvas, 0, 0);
   heightContext.globalCompositeOperation = "source-in";
-  heightContext.fillStyle = "#8c8c8c";
+  heightContext.fillStyle = "#555555";
   heightContext.fillRect(0, 0, heightCanvas.width, heightCanvas.height);
-  heightContext.globalCompositeOperation = "source-atop";
-
-  const ridgeWidth = threadWeight === "W30" ? 2.8 : threadWeight === "W60" ? 1.25 : 2;
-  heightContext.lineCap = "round";
-  heightContext.lineWidth = ridgeWidth;
-  heightContext.strokeStyle = "rgba(255,255,255,0.94)";
-  for (let x = -heightCanvas.height; x < heightCanvas.width + heightCanvas.height; x += spacing) {
-    heightContext.beginPath();
-    heightContext.moveTo(x, 0);
-    heightContext.lineTo(x + heightCanvas.height, heightCanvas.height);
-    heightContext.stroke();
-  }
-
-  heightContext.lineWidth = Math.max(0.75, ridgeWidth * 0.45);
-  heightContext.strokeStyle = "rgba(20,20,20,0.72)";
-  for (let x = -heightCanvas.height + spacing * 0.58; x < heightCanvas.width + heightCanvas.height; x += spacing) {
-    heightContext.beginPath();
-    heightContext.moveTo(x, 0);
-    heightContext.lineTo(x + heightCanvas.height, heightCanvas.height);
-    heightContext.stroke();
-  }
   heightContext.globalCompositeOperation = "source-over";
+  for (const layer of stitchLayers) drawHeightLayer(heightContext, layer, heightCanvas.width, heightCanvas.height);
+  const normalCanvas = createNormalMap(heightCanvas);
 
   return {
     colorUrl: canvas.toDataURL("image/png"),
     heightUrl: heightCanvas.toDataURL("image/png"),
+    normalUrl: normalCanvas.toDataURL("image/png"),
+    stitchLayers,
   };
 }

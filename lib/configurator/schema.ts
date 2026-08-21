@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { normalizePhoneNumber } from "@/lib/portal/phone";
+import { STITCH_STYLES } from "./stitch-simulation";
 
 const hexColor = z.string().regex(/^#[0-9A-F]{6}$/i, "Expected a six-digit hex color");
 
@@ -38,6 +39,7 @@ export const configuratorConfigurationSchema = z.object({
   rotationDegrees: z.number().min(-30).max(30),
   threadWeight: z.enum(["W30", "W40", "W60"]),
   densityMm: z.number().min(0.3).max(0.65),
+  stitchStyle: z.enum(STITCH_STYLES).optional().default("PATCH"),
   colors: z.array(threadMappingSchema).min(1).max(12),
   border: z.object({
     style: z.enum(["NONE", "SATIN", "MERROW"]),

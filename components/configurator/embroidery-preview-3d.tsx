@@ -2,10 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { STITCH_SEGMENT_STRIDE, type StitchLayer } from "@/lib/configurator/stitch-simulation";
 
 interface EmbroideryPreview3DProps {
   textureUrl: string | null;
   heightTextureUrl: string | null;
+  normalTextureUrl: string | null;
+  stitchLayers: StitchLayer[];
   garmentColor: string;
   productCategory: string;
   widthInches: number;
@@ -27,9 +30,11 @@ interface SceneState {
   presentation: THREE.Group;
   fabric: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
   artwork: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshPhysicalMaterial>;
+  stitchGroup: THREE.Group;
   fabricTexture: THREE.CanvasTexture;
   artworkTexture: THREE.Texture | null;
   artworkHeightTexture: THREE.Texture | null;
+  artworkNormalTexture: THREE.Texture | null;
   frameId: number;
   reducedMotion: boolean;
   dragging: boolean;
@@ -89,9 +94,22 @@ function disposeMaterial(material: THREE.Material) {
   material.dispose();
 }
 
+function clearStitchGroup(group: THREE.Group) {
+  for (const child of [...group.children]) {
+    group.remove(child);
+    if (child instanceof THREE.Mesh) {
+      child.geometry.dispose();
+      if (Array.isArray(child.material)) child.material.forEach(disposeMaterial);
+      else disposeMaterial(child.material);
+    }
+  }
+}
+
 export function EmbroideryPreview3D({
   textureUrl,
   heightTextureUrl,
+  normalTextureUrl,
+  stitchLayers,
   garmentColor,
   productCategory,
   widthInches,
@@ -158,15 +176,15 @@ export function EmbroideryPreview3D({
       const artworkMaterial = new THREE.MeshPhysicalMaterial({
         transparent: true,
         alphaTest: 0.025,
-        roughness: 0.31,
-        metalness: 0.015,
-        clearcoat: 0.48,
-        clearcoatRoughness: 0.38,
-        sheen: 0.58,
-        sheenRoughness: 0.48,
+        roughness: 0.38,
+        metalness: 0,
+        clearcoat: 0.22,
+        clearcoatRoughness: 0.5,
+        sheen: 0.72,
+        sheenRoughness: 0.38,
         sheenColor: new THREE.Color("#fff4df"),
         side: THREE.DoubleSide,
-        depthWrite: false,
+        depthWrite: true,
         polygonOffset: true,
         polygonOffsetFactor: -2,
       });
@@ -174,6 +192,11 @@ export function EmbroideryPreview3D({
       artwork.position.z = 0.22;
       artwork.visible = false;
       presentation.add(artwork);
+
+      const stitchGroup = new THREE.Group();
+      stitchGroup.name = "Dimensional thread strands";
+      stitchGroup.position.z = 0.024;
+      artwork.add(stitchGroup);
 
       const hemisphere = new THREE.HemisphereLight(0xfff8eb, 0x4c4037, 2.2);
       scene.add(hemisphere);
@@ -185,6 +208,9 @@ export function EmbroideryPreview3D({
       const rim = new THREE.PointLight(0xc68d5b, 2.8, 25);
       rim.position.set(5, 1.5, 4);
       scene.add(rim);
+      const grazing = new THREE.DirectionalLight(0xffffff, 2.1);
+      grazing.position.set(4.5, -1.5, 2.6);
+      scene.add(grazing);
 
       const ground = new THREE.Mesh(
         new THREE.PlaneGeometry(22, 22),
@@ -203,9 +229,11 @@ export function EmbroideryPreview3D({
         presentation,
         fabric,
         artwork,
+        stitchGroup,
         fabricTexture,
         artworkTexture: null,
         artworkHeightTexture: null,
+        artworkNormalTexture: null,
         frameId: 0,
         reducedMotion,
         dragging: false,
@@ -288,6 +316,7 @@ export function EmbroideryPreview3D({
         fabricTexture.dispose();
         state?.artworkTexture?.dispose();
         state?.artworkHeightTexture?.dispose();
+        state?.artworkNormalTexture?.dispose();
         renderer.dispose();
         renderer.domElement.remove();
         sceneRef.current = null;
@@ -323,10 +352,10 @@ export function EmbroideryPreview3D({
     if (!state) return;
     const relief = threadWeight === "W30" ? 0.19 : threadWeight === "W60" ? 0.105 : 0.145;
     const densityRelief = THREE.MathUtils.clamp(0.45 / densityMm, 0.78, 1.4);
-    state.artwork.material.bumpScale = relief * 1.2 * densityRelief;
-    state.artwork.material.displacementScale = relief * densityRelief;
-    state.artwork.material.displacementBias = -relief * 0.08;
-    state.artwork.position.set(positionX * 1.75, positionY * 2.05, /cap|hat/i.test(productCategory) ? 0.55 : 0.22);
+    state.artwork.material.bumpScale = relief * 0.72 * densityRelief;
+    state.artwork.material.displacementScale = relief * 0.16 * densityRelief;
+    state.artwork.material.displacementBias = -relief * 0.018;
+    state.artwork.position.set(positionX * 1.75, positionY * 2.05, /cap|hat/i.test(productCategory) ? 0.55 : 0.09);
     state.artwork.rotation.z = THREE.MathUtils.degToRad(rotationDegrees);
     state.artwork.scale.set(widthInches * 0.54, heightInches * 0.54, 1);
   }, [densityMm, heightInches, positionX, positionY, productCategory, rotationDegrees, threadWeight, widthInches]);
@@ -402,6 +431,104 @@ export function EmbroideryPreview3D({
       cancelled = true;
     };
   }, [heightTextureUrl]);
+
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    if (!normalTextureUrl) {
+      state.artwork.material.normalMap = null;
+      state.artwork.material.needsUpdate = true;
+      state.artworkNormalTexture?.dispose();
+      state.artworkNormalTexture = null;
+      return;
+    }
+
+    let cancelled = false;
+    new THREE.TextureLoader().load(
+      normalTextureUrl,
+      (texture) => {
+        if (cancelled || !sceneRef.current) {
+          texture.dispose();
+          return;
+        }
+        texture.colorSpace = THREE.NoColorSpace;
+        texture.anisotropy = Math.min(8, state.renderer.capabilities.getMaxAnisotropy());
+        state.artworkNormalTexture?.dispose();
+        state.artworkNormalTexture = texture;
+        state.artwork.material.normalMap = texture;
+        state.artwork.material.normalScale.set(0.78, 0.78);
+        state.artwork.material.needsUpdate = true;
+      },
+      undefined,
+      () => setFailed(true),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [normalTextureUrl]);
+
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    clearStitchGroup(state.stitchGroup);
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+    const scale = new THREE.Vector3();
+    const zAxis = new THREE.Vector3(0, 0, 1);
+
+    for (const layer of stitchLayers) {
+      const count = Math.floor(layer.segments.length / STITCH_SEGMENT_STRIDE);
+      if (count === 0) continue;
+      const geometry = new THREE.CapsuleGeometry(0.5, 1, 2, 6);
+      const threadColor = new THREE.Color(layer.colorHex);
+      const sheenColor = threadColor.clone().lerp(new THREE.Color("#fff7e8"), 0.68);
+      const material = new THREE.MeshPhysicalMaterial({
+        color: threadColor,
+        roughness: 0.34,
+        metalness: 0,
+        clearcoat: 0.2,
+        clearcoatRoughness: 0.42,
+        sheen: 1,
+        sheenRoughness: 0.28,
+        sheenColor,
+        specularIntensity: 1,
+      });
+      const mesh = new THREE.InstancedMesh(geometry, material, count);
+      mesh.name = `${layer.colorHex} thread strands`;
+      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 2;
+
+      let instance = 0;
+      for (let offset = 0; offset < layer.segments.length; offset += STITCH_SEGMENT_STRIDE) {
+        const vectorX = layer.segments[offset + 2];
+        const vectorY = layer.segments[offset + 3];
+        const length = Math.hypot(vectorX, vectorY);
+        const width = Math.max(0.0012, layer.segments[offset + 4] * 1.18);
+        const relief = layer.segments[offset + 5];
+        position.set(
+          layer.segments[offset],
+          layer.segments[offset + 1],
+          0.012 + relief * 0.006,
+        );
+        quaternion.setFromAxisAngle(zAxis, Math.atan2(vectorY, vectorX) - Math.PI / 2);
+        scale.set(width, Math.max(0.0008, length / 2), 0.014 * relief);
+        matrix.compose(position, quaternion, scale);
+        mesh.setMatrixAt(instance++, matrix);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      state.stitchGroup.add(mesh);
+    }
+    state.stitchGroup.visible = !!textureUrl && stitchLayers.length > 0;
+
+    return () => {
+      const current = sceneRef.current;
+      if (current) clearStitchGroup(current.stitchGroup);
+    };
+  }, [stitchLayers, textureUrl]);
 
   if (failed) {
     return (

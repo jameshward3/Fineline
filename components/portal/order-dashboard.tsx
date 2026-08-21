@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { Check, Clock3, Palette, PackageCheck, Ruler, Scissors, Sparkles } from "lucide-react";
 import type { PortalOrder } from "@/lib/portal/orders";
+import { stitchStyleLabel } from "@/lib/configurator/stitch-simulation";
 import styles from "./order-portal.module.css";
 
 const PROGRESS_STEPS = ["Submitted", "Stitch review", "Production", "Complete"];
@@ -87,6 +88,7 @@ export function OrderDashboard({ order }: { order: PortalOrder }) {
               </div>
               <dl className={styles.compactDetails}>
                 <div><dt><Palette size={14} /> Thread</dt><dd>{order.threadWeight.replace("W", "")} wt</dd></div>
+                <div><dt><Sparkles size={14} /> Construction</dt><dd>{stitchStyleLabel(order.stitchStyle)}</dd></div>
                 <div><dt><Sparkles size={14} /> Density</dt><dd>{order.densityMm.toFixed(2)} mm</dd></div>
                 <div><dt><Scissors size={14} /> Edge</dt><dd>{order.borderStyle === "NONE" ? "No border" : order.borderStyle.toLowerCase()}</dd></div>
               </dl>
