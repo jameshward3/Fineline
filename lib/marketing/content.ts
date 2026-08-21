@@ -20,7 +20,7 @@ export const primaryNav: NavItem[] = [
 
 export const utilityNav: NavItem[] = [
   { label: "Client Portal", href: "/portal" },
-  { label: "Start an Order", href: "/start" },
+  { label: "Start an Order", href: "/configure" },
 ];
 
 export type Category = {

@@ -36,3 +36,16 @@ Seeded demo login: `admin@stitchos.dev` / `stitchos-dev` (also `designer@`,
   filesystem implementation for development.
 - **Branding** is centralized in `lib/branding.ts` — nothing else hard-codes
   company name, logo, or brand colors.
+
+## Public embroidery configurator
+
+`/configure` is the production customer intake experience. It provides artwork
+upload, thread mapping, weight/density and border controls, product placement,
+server-verified pricing, and a Three.js proof. Submissions create linked CRM
+account/contact, opportunity, design/version, artwork, job, job item, notes,
+and `ConfiguratorSubmission` records in one transaction.
+
+Apply `prisma/migrations/20260821133000_public_configurator/migration.sql`,
+connect a Vercel Blob store, and set the configurator variables shown in
+`.env.example`. See `docs/embedding-configurator.md` for the Fine Line site
+embed and Vercel/Supabase deployment checklist.

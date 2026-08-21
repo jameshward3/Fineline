@@ -26,7 +26,7 @@ export default function PortalPage() {
         </p>
         <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
           <Link
-            href="/start"
+            href="/configure"
             className="border border-fl-charcoal bg-fl-charcoal px-7 py-3.5 font-sans text-xs uppercase tracking-[0.22em] text-fl-paper transition-colors hover:bg-transparent hover:text-fl-charcoal"
           >
             Start an Order

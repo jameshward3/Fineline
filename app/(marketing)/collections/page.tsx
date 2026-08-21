@@ -88,7 +88,7 @@ export default function CollectionsPage() {
                 ))}
               </ul>
               <Link
-                href="/start"
+                href="/configure"
                 className="mt-8 inline-block border border-fl-charcoal px-7 py-3 font-sans text-xs uppercase tracking-[0.2em] text-fl-charcoal transition-colors hover:bg-fl-charcoal hover:text-fl-paper"
               >
                 Start an Order

@@ -20,7 +20,7 @@ export function CategoryDetail({
           <p className="mt-6 max-w-md font-sans text-base leading-relaxed text-fl-ink-muted">{intro}</p>
           <div className="mt-9 flex flex-wrap items-center gap-4">
             <Link
-              href="/start"
+              href="/configure"
               className="border border-fl-charcoal bg-fl-charcoal px-7 py-3.5 font-sans text-xs uppercase tracking-[0.22em] text-fl-paper transition-colors hover:bg-transparent hover:text-fl-charcoal"
             >
               Start an Order
@@ -57,7 +57,7 @@ export function CategoryDetail({
             Bring us an idea. We&rsquo;ll help make it real.
           </h2>
           <Link
-            href="/start"
+            href="/configure"
             className="border border-fl-champagne px-8 py-3.5 font-sans text-xs uppercase tracking-[0.24em] text-fl-champagne transition-colors hover:bg-fl-champagne hover:text-fl-charcoal"
           >
             Start Your Journey

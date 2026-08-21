@@ -38,7 +38,7 @@ function HeroSection() {
             Explore Collections
           </Link>
           <Link
-            href="/start"
+            href="/configure"
             className="px-2 py-3.5 font-sans text-xs uppercase tracking-[0.22em] text-fl-charcoal underline decoration-fl-ink-faint underline-offset-8 hover:decoration-fl-charcoal"
           >
             Start an Order
@@ -162,7 +162,7 @@ function ClosingCta() {
           Bring us an idea. We&rsquo;ll help make it real.
         </p>
         <Link
-          href="/start"
+          href="/configure"
           className="border border-fl-champagne px-8 py-3.5 font-sans text-xs uppercase tracking-[0.24em] text-fl-champagne transition-colors hover:bg-fl-champagne hover:text-fl-charcoal"
         >
           Start Your Journey
