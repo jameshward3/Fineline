@@ -12,13 +12,13 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-fl-gold/60 bg-fl-ivory/95 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 sm:px-8">
+    <header className="sticky top-0 z-30 bg-[#f6f2ec]/95 backdrop-blur">
+      <div className="mx-auto flex h-[88px] max-w-[1440px] items-center justify-between px-6 sm:px-10 lg:px-16">
         <Link href="/" className="flex items-center gap-2 text-fl-charcoal" onClick={() => setOpen(false)}>
-          <svg viewBox="-100 -110 200 230" className="h-9 w-9" aria-hidden>
+          <svg viewBox="-100 -110 200 230" className="h-12 w-12" aria-hidden>
             <LogoLockup id="header-mark" showThread className="text-fl-charcoal" />
           </svg>
-          <span className="font-serif text-sm tracking-[0.08em]">Fine Line Studio</span>
+          <span className="font-serif text-sm tracking-[0.16em]">FINE LINE <span className="block text-[7px] tracking-[.45em]">STUDIO</span></span>
         </Link>
 
         <nav className="hidden items-center gap-7 lg:flex">
@@ -38,21 +38,6 @@ export function SiteHeader() {
             );
           })}
         </nav>
-
-        <div className="hidden items-center gap-5 lg:flex">
-          <Link
-            href={utilityNav[0].href}
-            className="font-sans text-[11px] uppercase tracking-[0.18em] text-fl-ink-muted transition-colors hover:text-fl-charcoal"
-          >
-            {utilityNav[0].label}
-          </Link>
-          <Link
-            href={utilityNav[1].href}
-            className="border border-fl-charcoal px-5 py-2 font-sans text-[11px] uppercase tracking-[0.18em] text-fl-charcoal transition-colors hover:bg-fl-charcoal hover:text-fl-paper"
-          >
-            {utilityNav[1].label}
-          </Link>
-        </div>
 
         <button
           type="button"
