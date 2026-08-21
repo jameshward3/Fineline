@@ -126,10 +126,12 @@ export function EmbroideryPreview3D({
   const hostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneState | null>(null);
   const zoomRef = useRef(zoom);
+  const productCategoryRef = useRef(productCategory);
   const onZoomChangeRef = useRef(onZoomChange);
   const [failed, setFailed] = useState(false);
 
   zoomRef.current = zoom;
+  productCategoryRef.current = productCategory;
   onZoomChangeRef.current = onZoomChange;
 
   useEffect(() => {
@@ -286,6 +288,8 @@ export function EmbroideryPreview3D({
       renderer.domElement.addEventListener("wheel", onWheel, { passive: false });
 
       const started = performance.now();
+      const artworkFocus = new THREE.Vector3();
+      const cameraTarget = new THREE.Vector3();
       const render = (time: number) => {
         if (!state) return;
         if (!state.reducedMotion && !state.dragging) {
@@ -293,6 +297,19 @@ export function EmbroideryPreview3D({
           state.presentation.position.y = Math.sin(elapsed * 0.45) * 0.035;
           state.presentation.rotation.z = -0.02 + Math.sin(elapsed * 0.32) * 0.012;
         }
+        state.artwork.getWorldPosition(artworkFocus);
+        const artworkFocusAmount = THREE.MathUtils.smoothstep(zoomRef.current, 1, 1.25);
+        cameraTarget.set(
+          THREE.MathUtils.lerp(0, artworkFocus.x, artworkFocusAmount),
+          THREE.MathUtils.lerp(0.1, artworkFocus.y, artworkFocusAmount),
+          THREE.MathUtils.lerp(0, artworkFocus.z, artworkFocusAmount),
+        );
+        state.camera.position.set(
+          cameraTarget.x,
+          cameraTarget.y,
+          cameraTarget.z + cameraDistance(productCategoryRef.current, zoomRef.current),
+        );
+        state.camera.lookAt(cameraTarget);
         state.renderer.render(state.scene, state.camera);
         state.frameId = requestAnimationFrame(render);
       };
