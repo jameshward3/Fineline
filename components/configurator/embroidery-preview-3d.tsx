@@ -5,6 +5,7 @@ import * as THREE from "three";
 
 interface EmbroideryPreview3DProps {
   textureUrl: string | null;
+  heightTextureUrl: string | null;
   garmentColor: string;
   productCategory: string;
   widthInches: number;
@@ -14,6 +15,8 @@ interface EmbroideryPreview3DProps {
   rotationDegrees: number;
   densityMm: number;
   threadWeight: "W30" | "W40" | "W60";
+  zoom: number;
+  onZoomChange: (zoom: number) => void;
   className?: string;
 }
 
@@ -26,6 +29,7 @@ interface SceneState {
   artwork: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshPhysicalMaterial>;
   fabricTexture: THREE.CanvasTexture;
   artworkTexture: THREE.Texture | null;
+  artworkHeightTexture: THREE.Texture | null;
   frameId: number;
   reducedMotion: boolean;
   dragging: boolean;
@@ -76,12 +80,18 @@ function makeFabricGeometry(category: string) {
   return geometry;
 }
 
+function cameraDistance(category: string, zoom: number) {
+  const baseDistance = /cap|hat/i.test(category) ? 8.1 : 9.3;
+  return THREE.MathUtils.clamp(baseDistance / zoom, 3.05, 13.5);
+}
+
 function disposeMaterial(material: THREE.Material) {
   material.dispose();
 }
 
 export function EmbroideryPreview3D({
   textureUrl,
+  heightTextureUrl,
   garmentColor,
   productCategory,
   widthInches,
@@ -91,11 +101,18 @@ export function EmbroideryPreview3D({
   rotationDegrees,
   densityMm,
   threadWeight,
+  zoom,
+  onZoomChange,
   className,
 }: EmbroideryPreview3DProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<SceneState | null>(null);
+  const zoomRef = useRef(zoom);
+  const onZoomChangeRef = useRef(onZoomChange);
   const [failed, setFailed] = useState(false);
+
+  zoomRef.current = zoom;
+  onZoomChangeRef.current = onZoomChange;
 
   useEffect(() => {
     const host = hostRef.current;
@@ -118,7 +135,7 @@ export function EmbroideryPreview3D({
       const scene = new THREE.Scene();
       scene.fog = new THREE.FogExp2(0xd8cec0, 0.045);
       const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
-      camera.position.set(0, 0.1, 9.3);
+      camera.position.set(0, 0.1, cameraDistance("Polo Shirt", zoomRef.current));
 
       const presentation = new THREE.Group();
       presentation.rotation.set(-0.08, 0.08, -0.02);
@@ -141,10 +158,13 @@ export function EmbroideryPreview3D({
       const artworkMaterial = new THREE.MeshPhysicalMaterial({
         transparent: true,
         alphaTest: 0.025,
-        roughness: 0.38,
-        metalness: 0.04,
-        clearcoat: 0.3,
-        clearcoatRoughness: 0.52,
+        roughness: 0.31,
+        metalness: 0.015,
+        clearcoat: 0.48,
+        clearcoatRoughness: 0.38,
+        sheen: 0.58,
+        sheenRoughness: 0.48,
+        sheenColor: new THREE.Color("#fff4df"),
         side: THREE.DoubleSide,
         depthWrite: false,
         polygonOffset: true,
@@ -185,6 +205,7 @@ export function EmbroideryPreview3D({
         artwork,
         fabricTexture,
         artworkTexture: null,
+        artworkHeightTexture: null,
         frameId: 0,
         reducedMotion,
         dragging: false,
@@ -227,7 +248,8 @@ export function EmbroideryPreview3D({
       const onWheel = (event: WheelEvent) => {
         if (!state) return;
         event.preventDefault();
-        state.camera.position.z = THREE.MathUtils.clamp(state.camera.position.z + event.deltaY * 0.008, 6.5, 13);
+        const nextZoom = THREE.MathUtils.clamp(zoomRef.current - event.deltaY * 0.0018, 0.65, 2.75);
+        onZoomChangeRef.current(Number(nextZoom.toFixed(3)));
       };
       renderer.domElement.addEventListener("pointerdown", onPointerDown);
       renderer.domElement.addEventListener("pointermove", onPointerMove);
@@ -265,6 +287,7 @@ export function EmbroideryPreview3D({
         });
         fabricTexture.dispose();
         state?.artworkTexture?.dispose();
+        state?.artworkHeightTexture?.dispose();
         renderer.dispose();
         renderer.domElement.remove();
         sceneRef.current = null;
@@ -287,15 +310,22 @@ export function EmbroideryPreview3D({
     const previousGeometry = state.fabric.geometry;
     state.fabric.geometry = makeFabricGeometry(productCategory);
     previousGeometry.dispose();
-    const isCap = /cap|hat/i.test(productCategory);
-    state.camera.position.z = isCap ? 8.1 : 9.3;
   }, [productCategory]);
 
   useEffect(() => {
     const state = sceneRef.current;
     if (!state) return;
-    const relief = threadWeight === "W30" ? 0.055 : threadWeight === "W60" ? 0.032 : 0.043;
-    state.artwork.material.bumpScale = relief * (0.45 / densityMm);
+    state.camera.position.z = cameraDistance(productCategory, zoom);
+  }, [productCategory, zoom]);
+
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    const relief = threadWeight === "W30" ? 0.19 : threadWeight === "W60" ? 0.105 : 0.145;
+    const densityRelief = THREE.MathUtils.clamp(0.45 / densityMm, 0.78, 1.4);
+    state.artwork.material.bumpScale = relief * 1.2 * densityRelief;
+    state.artwork.material.displacementScale = relief * densityRelief;
+    state.artwork.material.displacementBias = -relief * 0.08;
     state.artwork.position.set(positionX * 1.75, positionY * 2.05, /cap|hat/i.test(productCategory) ? 0.55 : 0.22);
     state.artwork.rotation.z = THREE.MathUtils.degToRad(rotationDegrees);
     state.artwork.scale.set(widthInches * 0.54, heightInches * 0.54, 1);
@@ -307,7 +337,6 @@ export function EmbroideryPreview3D({
     if (!textureUrl) {
       state.artwork.visible = false;
       state.artwork.material.map = null;
-      state.artwork.material.bumpMap = null;
       state.artwork.material.needsUpdate = true;
       state.artworkTexture?.dispose();
       state.artworkTexture = null;
@@ -327,7 +356,6 @@ export function EmbroideryPreview3D({
         state.artworkTexture?.dispose();
         state.artworkTexture = texture;
         state.artwork.material.map = texture;
-        state.artwork.material.bumpMap = texture;
         state.artwork.material.needsUpdate = true;
         state.artwork.visible = true;
       },
@@ -338,6 +366,42 @@ export function EmbroideryPreview3D({
       cancelled = true;
     };
   }, [textureUrl]);
+
+  useEffect(() => {
+    const state = sceneRef.current;
+    if (!state) return;
+    if (!heightTextureUrl) {
+      state.artwork.material.bumpMap = null;
+      state.artwork.material.displacementMap = null;
+      state.artwork.material.needsUpdate = true;
+      state.artworkHeightTexture?.dispose();
+      state.artworkHeightTexture = null;
+      return;
+    }
+
+    let cancelled = false;
+    new THREE.TextureLoader().load(
+      heightTextureUrl,
+      (texture) => {
+        if (cancelled || !sceneRef.current) {
+          texture.dispose();
+          return;
+        }
+        texture.colorSpace = THREE.NoColorSpace;
+        texture.anisotropy = Math.min(8, state.renderer.capabilities.getMaxAnisotropy());
+        state.artworkHeightTexture?.dispose();
+        state.artworkHeightTexture = texture;
+        state.artwork.material.bumpMap = texture;
+        state.artwork.material.displacementMap = texture;
+        state.artwork.material.needsUpdate = true;
+      },
+      undefined,
+      () => setFailed(true),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [heightTextureUrl]);
 
   if (failed) {
     return (

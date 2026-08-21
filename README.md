@@ -39,13 +39,20 @@ Seeded demo login: `admin@stitchos.dev` / `stitchos-dev` (also `designer@`,
 
 ## Public embroidery configurator
 
-`/configure` is the production customer intake experience. It provides artwork
-upload, thread mapping, weight/density and border controls, product placement,
-server-verified pricing, and a Three.js proof. Submissions create linked CRM
+`/configure` is the production customer intake experience. It establishes the
+product and quantity first, then provides artwork upload, thread mapping,
+weight/density and border controls, product placement, server-verified pricing,
+and a zoomable Three.js proof with a dedicated stitch-relief map. Submissions create linked CRM
 account/contact, opportunity, design/version, artwork, job, job item, notes,
 and `ConfiguratorSubmission` records in one transaction.
 
+Successful submissions continue to `/orders/sign-in`, where the customer
+verifies the CRM phone number through Twilio Verify. The resulting HTTP-only
+session opens the new order dashboard and the account's previous orders; it is
+separate from the existing internal staff login.
+
 Apply `prisma/migrations/20260821133000_public_configurator/migration.sql`,
-connect a Vercel Blob store, and set the configurator variables shown in
+then `prisma/migrations/20260821153000_customer_portal/migration.sql`, connect a
+Vercel Blob store and Twilio Verify service, and set the variables shown in
 `.env.example`. See `docs/embedding-configurator.md` for the Fine Line site
 embed and Vercel/Supabase deployment checklist.

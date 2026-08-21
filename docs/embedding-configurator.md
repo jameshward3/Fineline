@@ -40,8 +40,14 @@ experience should appear:
       }
       if (event.data.type === "submitted") {
         window.dispatchEvent(new CustomEvent("fine-line:configuration-submitted", {
-          detail: { orderReference: event.data.orderReference },
+          detail: {
+            orderReference: event.data.orderReference,
+            portalUrl: event.data.portalUrl,
+          },
         }));
+        if (typeof event.data.portalUrl === "string") {
+          window.location.assign(new URL(event.data.portalUrl, configuratorOrigin));
+        }
       }
     });
   })();
@@ -63,6 +69,12 @@ embedding. The repository’s marketing CTAs already use that route.
 | `STITCHOS_PUBLIC_ORGANIZATION_ID` | server | CRM tenant that owns public submissions (currently `org_demo`) |
 | `STITCHOS_PUBLIC_OWNER_EMAIL` | server | Active StitchOS user assigned as submission owner |
 | `STITCHOS_INTAKE_SECRET` | server, optional | Trusted server-to-server intake; never expose to browser code |
+| `PORTAL_AUTH_SECRET` | server | Independent HMAC key for phone-login rate-limit identifiers |
+| `PORTAL_SESSION_DAYS` | server, optional | Customer session lifetime, 1–90 days; defaults to 30 |
+| `TWILIO_VERIFY_SERVICE_SID` | server | Twilio Verify service used to deliver one-time SMS codes |
+| `TWILIO_API_KEY` + `TWILIO_API_SECRET` | server | Recommended Twilio production credentials |
+| `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` | server, fallback | Supported fallback when an API key is not configured |
+| `PORTAL_DEV_OTP` | local only | Visible local verification code; ignored in production |
 
 No Supabase service-role or anonymous key is needed in the browser. All CRM
 writes go through Prisma on the server.
@@ -81,19 +93,37 @@ npm run build
 Migration `20260821133000_public_configurator` adds the structured
 `ConfiguratorSubmission` record and links it to the normal StitchOS client,
 opportunity, design/version, and job records. It does not alter or delete
-existing CRM data.
+existing CRM data. Migration `20260821153000_customer_portal` adds short-lived
+phone challenges and revocable hashed portal sessions linked to the existing
+`Client` record.
+
+## Customer order portal
+
+- `/orders/sign-in` requests a one-time code for a phone already attached to a
+  CRM client or contact. Unknown numbers receive the same generic response and
+  no SMS, reducing account enumeration and messaging abuse.
+- `/orders` lists the verified client's current and past orders.
+- `/orders/[reference]` shows artwork, product/placement, thread selections,
+  price estimate, and live StitchOS production status.
+- Submission redirects to `/orders/sign-in?order=<job-number>`. After phone
+  verification, the customer lands directly on that order.
+- The challenge API enforces database-backed limits of four requests per phone
+  and ten per IP in fifteen minutes. Add a Vercel Firewall limit as a second
+  layer in production.
 
 ## Production controls
 
 1. Attach the existing Vercel Blob store to every environment where uploads
    should work.
-2. In Vercel Firewall, rate-limit `/api/public/configurator` and
-   `/api/public/configurator/upload` (a starting point is 10 token/submission
-   requests per IP per 10 minutes).
+2. In Vercel Firewall, rate-limit `/api/public/configurator`,
+   `/api/public/configurator/upload`, and `/api/public/portal/*` (a starting
+   point is 10 token/submission requests per IP per 10 minutes and 10 portal
+   requests per IP per 15 minutes).
 3. Keep the route’s `frame-ancestors` list in `next.config.mjs` synchronized
    with the production host domains.
-4. Run one end-to-end submission after deployment and confirm the linked CRM
-   opportunity, design, artwork asset, job item, notes, and estimate.
+4. Run one end-to-end submission after deployment, verify the SMS code, and
+   confirm the linked CRM opportunity, design, artwork asset, job item, notes,
+   estimate, portal order, and previous-order history.
 5. Treat the displayed price as an estimate. The API recalculates it using
    pricing version `2026.08.1`; studio review and a sew test remain the final
    authority.

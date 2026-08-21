@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { calculateConfiguratorQuote } from "./pricing";
 import type { ConfiguratorSubmissionInput } from "./schema";
 import { getPublicStudioContext } from "./server-context";
+import { normalizePhoneNumber, phoneLookupCandidates } from "@/lib/portal/phone";
 
 export class ConfiguratorIntakeError extends Error {
   constructor(message: string, readonly status = 400) {
@@ -87,11 +88,21 @@ export async function createConfiguratorSubmission(data: ConfiguratorSubmissionI
 
   const { organizationId, ownerId } = await getPublicStudioContext();
   const email = data.customer.email.toLowerCase();
+  const phone = normalizePhoneNumber(data.customer.phone);
+  if (!phone) throw new ConfiguratorIntakeError("Enter a valid mobile number.");
+  const phoneCandidates = phoneLookupCandidates(phone);
   const jobNumber = jobNumberFor(data.idempotencyKey);
 
   return prisma.$transaction(async (tx) => {
     const existingClient = await tx.client.findFirst({
-      where: { organizationId, email: { equals: email, mode: "insensitive" }, active: true },
+      where: {
+        organizationId,
+        active: true,
+        OR: [
+          { phone: { in: phoneCandidates } },
+          { contacts: { some: { phone: { in: phoneCandidates } } } },
+        ],
+      },
       orderBy: { updatedAt: "desc" },
     });
 
@@ -100,7 +111,8 @@ export async function createConfiguratorSubmission(data: ConfiguratorSubmissionI
           where: { id: existingClient.id },
           data: {
             contactName: data.customer.name,
-            phone: data.customer.phone || existingClient.phone,
+            email,
+            phone,
             name: data.customer.organization || existingClient.name,
             leadSource: "fineligne.co/configure",
           },
@@ -111,7 +123,7 @@ export async function createConfiguratorSubmission(data: ConfiguratorSubmissionI
             name: data.customer.organization || data.customer.name,
             contactName: data.customer.name,
             email,
-            phone: data.customer.phone || null,
+            phone,
             notes: data.configuration.notes || null,
             accountType: accountType(data.projectType),
             leadSource: "fineligne.co/configure",
@@ -120,17 +132,28 @@ export async function createConfiguratorSubmission(data: ConfiguratorSubmissionI
         });
 
     const contact = await tx.contact.findFirst({
-      where: { clientId: client.id, email: { equals: email, mode: "insensitive" } },
+      where: {
+        clientId: client.id,
+        OR: [
+          { email: { equals: email, mode: "insensitive" } },
+          { phone: { in: phoneCandidates } },
+        ],
+      },
       select: { id: true },
     });
-    if (!contact) {
+    if (contact) {
+      await tx.contact.update({
+        where: { id: contact.id },
+        data: { name: data.customer.name, role: "PRIMARY", email, phone },
+      });
+    } else {
       await tx.contact.create({
         data: {
           clientId: client.id,
           name: data.customer.name,
           role: "PRIMARY",
           email,
-          phone: data.customer.phone || null,
+          phone,
         },
       });
     }

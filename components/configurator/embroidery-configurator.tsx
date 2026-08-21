@@ -3,6 +3,7 @@
 import { upload } from "@vercel/blob/client";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -12,9 +13,14 @@ import {
   LoaderCircle,
   Lock,
   Maximize2,
+  Minus,
+  PackageCheck,
+  Plus,
   RotateCcw,
   Sparkles,
   UploadCloud,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LogoLockup } from "@/components/story/marks";
@@ -25,11 +31,12 @@ import { loadImageFile, formatBytes } from "@/lib/wizard/canvas-utils";
 import { deltaE76, hexToLab } from "@/lib/color";
 import {
   FALLBACK_CATALOG,
+  categoryBasePrice,
   type ConfiguratorCatalog,
   type PublicProduct,
   type PublicThreadColor,
 } from "@/lib/configurator/catalog";
-import { createThreadTextureDataUrl, prepareArtworkBuffer } from "@/lib/configurator/artwork-texture";
+import { createThreadTextureMaps, prepareArtworkBuffer, type ThreadTextureMaps } from "@/lib/configurator/artwork-texture";
 import { calculateConfiguratorQuote, type BorderStyle, type ThreadWeightChoice } from "@/lib/configurator/pricing";
 import type { ConfiguratorThreadMapping } from "@/lib/configurator/schema";
 import type { ConfiguratorUploadIntent } from "@/lib/configurator/upload-intent";
@@ -41,7 +48,7 @@ const EmbroideryPreview3D = dynamic(
 );
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"] as const;
-const STEPS = ["Artwork", "Thread & finish", "Size & placement", "Order details"] as const;
+const STEPS = ["Product, quantity & artwork", "Thread & finish", "Size & placement", "Review & submit"] as const;
 
 interface ArtworkState {
   file: File;
@@ -119,6 +126,7 @@ function money(value: number) {
 }
 
 export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryConfiguratorProps) {
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const startedAtRef = useRef(Date.now());
   const idempotencyRef = useRef(
@@ -135,7 +143,7 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
   const [detectedColorCount, setDetectedColorCount] = useState(0);
   const [removeLightBackground, setRemoveLightBackground] = useState(true);
   const [processing, setProcessing] = useState(false);
-  const [textureUrl, setTextureUrl] = useState<string | null>(null);
+  const [textureMaps, setTextureMaps] = useState<ThreadTextureMaps | null>(null);
   const [designName, setDesignName] = useState("");
   const [threadWeight, setThreadWeight] = useState<ThreadWeightChoice>("W40");
   const [densityMm, setDensityMm] = useState(0.45);
@@ -151,6 +159,7 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
   const [positionX, setPositionX] = useState(-0.32);
   const [positionY, setPositionY] = useState(0.22);
   const [rotationDegrees, setRotationDegrees] = useState(0);
+  const [previewZoom, setPreviewZoom] = useState(1);
   const [quantity, setQuantity] = useState(12);
   const [projectType, setProjectType] = useState<"PERSONAL" | "CORPORATE" | "INSTITUTIONAL" | "OTHER">("PERSONAL");
   const [customer, setCustomer] = useState({ name: "", email: "", phone: "", organization: "", notes: "", consent: false });
@@ -159,7 +168,6 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [result, setResult] = useState<SubmissionResult | null>(null);
 
   const product = productFor(catalog, productKey);
   const placement = product.placements.find((item) => catalogKey(item) === placementKey) ?? product.placements[0];
@@ -213,11 +221,11 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
 
   useEffect(() => {
     if (!quantized || mappings.length !== quantized.palette.length) {
-      setTextureUrl(null);
+      setTextureMaps(null);
       return;
     }
     const timer = window.setTimeout(() => {
-      setTextureUrl(createThreadTextureDataUrl({
+      setTextureMaps(createThreadTextureMaps({
         buffer: quantized.preparedBuffer,
         clusters: quantized.pixelClusters,
         targetHexes: mappings.map((mapping) => mapping.targetHex),
@@ -321,6 +329,7 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
   }
 
   function canContinue() {
+    if (activeStep === 0 && (!product || quantity < 1)) return "Choose a product and quantity to continue.";
     if (activeStep === 0 && !artwork) return "Upload artwork to continue.";
     if (activeStep === 0 && !designName.trim()) return "Give this design a name.";
     if (activeStep === 1 && mappings.length === 0) return "Choose at least one production color.";
@@ -344,8 +353,8 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
       setError("Upload artwork before submitting.");
       return;
     }
-    if (!customer.name.trim() || !customer.email.trim() || !customer.consent) {
-      setError("Add your name and email, then confirm that the studio may contact you about this request.");
+    if (!customer.name.trim() || !customer.email.trim() || !customer.phone.trim() || !customer.consent) {
+      setError("Add your name, email, and mobile number, then confirm that the studio may contact you about this request.");
       return;
     }
     setError(null);
@@ -413,33 +422,14 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
       });
       const payload = await response.json() as SubmissionResult & { error?: string };
       if (!response.ok) throw new Error(payload.error || "The studio could not receive this configuration.");
-      setResult(payload);
-      notifyParent({ type: "submitted", orderReference: payload.orderReference });
+      const portalUrl = `/orders/sign-in?order=${encodeURIComponent(payload.orderReference)}`;
+      notifyParent({ type: "submitted", orderReference: payload.orderReference, portalUrl });
+      router.push(portalUrl);
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : "The studio could not receive this configuration.");
     } finally {
       setSubmitting(false);
     }
-  }
-
-  if (result) {
-    return (
-      <section className={`${styles.configurator} ${embedded ? styles.embedded : ""}`}>
-        <div className={styles.successPanel}>
-          <div className={styles.successMark}><Check aria-hidden size={30} /></div>
-          <p className={styles.eyebrow}>Configuration received</p>
-          <h1>Your idea is now with the studio.</h1>
-          <p>We’ll review stitch feasibility, confirm the material and placement, and return with a production-ready quote.</p>
-          <div className={styles.referenceCard}>
-            <span>Studio reference</span>
-            <strong>{result.orderReference}</strong>
-            <span>Current estimate</span>
-            <strong>{money(result.quote.total)}</strong>
-          </div>
-          <p className={styles.finePrint}>The estimate is not a charge. Final pricing follows artwork and material review.</p>
-        </div>
-      </section>
-    );
   }
 
   return (
@@ -482,7 +472,45 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
         <div className={styles.controls}>
           {activeStep === 0 && (
             <div className={styles.stepPanel}>
-              <StepHeading number="01" title="Begin with the artwork." copy="Transparent PNG or SVG gives the cleanest proof. A photograph or JPEG works too; we’ll isolate a light background for you." />
+              <StepHeading number="01" title="Choose the order, then add artwork." copy="Establish the product and quantity first so every size limit, placement, and estimate that follows is grounded in the right production setup." />
+              <div className={styles.startSection}>
+                <div className={styles.startSectionHeading}><span>Product</span><small>Select the object you want embroidered</small></div>
+                <div className={styles.productCards} aria-label="Embroidery products">
+                  {catalog.products.map((item) => {
+                    const selected = catalogKey(item) === productKey;
+                    return (
+                      <button
+                        key={catalogKey(item)}
+                        type="button"
+                        className={`${styles.productCard} ${selected ? styles.productCardSelected : ""}`}
+                        onClick={() => setProductKey(catalogKey(item))}
+                        aria-pressed={selected}
+                      >
+                        <span className={styles.productCardVisual}><PackageCheck size={23} /><small>{item.category}</small></span>
+                        <span className={styles.productCardCopy}>
+                          <strong>{item.name}</strong>
+                          <small>{item.material ?? "Studio-selected material"}</small>
+                          <em>From {money(categoryBasePrice(item.category))}</em>
+                        </span>
+                        {selected && <span className={styles.productCheck}><Check size={11} /></span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className={styles.startSection}>
+                <div className={styles.startSectionHeading}><span>Quantity</span><small>Volume pricing updates immediately</small></div>
+                <label className={styles.quantityField}>
+                  <span className={styles.visuallyHidden}>Quantity</span>
+                  <div>
+                    <button type="button" aria-label="Decrease quantity" onClick={() => setQuantity((value) => Math.max(1, value - 1))}><Minus size={14} /></button>
+                    <input aria-label="Quantity" type="number" min="1" max="5000" value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.min(5000, Number(event.target.value) || 1)))} />
+                    <button type="button" aria-label="Increase quantity" onClick={() => setQuantity((value) => Math.min(5000, value + 1))}><Plus size={14} /></button>
+                  </div>
+                </label>
+                <div className={styles.quantityPresets}>{[1, 12, 24, 48, 100, 250].map((amount) => <button key={amount} type="button" className={quantity === amount ? styles.selectedPill : ""} onClick={() => setQuantity(amount)} aria-pressed={quantity === amount}>{amount}</button>)}</div>
+              </div>
+              <div className={styles.startSectionHeading}><span>Artwork</span><small>Transparent PNG or SVG gives the cleanest proof</small></div>
               <div
                 className={`${styles.dropzone} ${dragging ? styles.dropzoneActive : ""}`}
                 onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
@@ -605,11 +633,13 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
 
           {activeStep === 2 && (
             <div className={styles.stepPanel}>
-              <StepHeading number="03" title="Set scale and placement." copy="Choose the object and its embroidery zone. The limits below come from the live StitchOS product catalog and production setups." />
-              <div className={styles.twoColumns}>
-                <label className={styles.field}><span>Object</span><select value={productKey} onChange={(event) => setProductKey(event.target.value)}>{catalog.products.map((item) => <option key={catalogKey(item)} value={catalogKey(item)}>{item.name}</option>)}</select></label>
-                <label className={styles.field}><span>Placement</span><select value={placementKey} onChange={(event) => setPlacementKey(event.target.value)}>{product.placements.map((item) => <option key={catalogKey(item)} value={catalogKey(item)}>{item.name}</option>)}</select></label>
+              <StepHeading number="03" title="Set scale and placement." copy="Position the artwork on the product chosen in step one. Placement limits come from the live StitchOS product catalog and production setups." />
+              <div className={styles.productRecap}>
+                <span><PackageCheck size={18} /><span><small>Selected product</small><strong>{product.name}</strong></span></span>
+                <span><small>Order quantity</small><strong>{quantity} units</strong></span>
+                <button type="button" onClick={() => { setError(null); setActiveStep(0); }}>Change</button>
               </div>
+              <label className={styles.field}><span>Placement</span><select value={placementKey} onChange={(event) => setPlacementKey(event.target.value)}>{product.placements.map((item) => <option key={catalogKey(item)} value={catalogKey(item)}>{item.name}</option>)}</select></label>
               <div className={styles.catalogNote}><span>{product.material}</span><span>Maximum {placement.maxWidthInches} × {placement.maxHeightInches} in</span></div>
               <div className={styles.sizeGrid}>
                 <label className={styles.field}><span>Width (in)</span><input type="number" min="0.25" max={placement.maxWidthInches} step="0.05" value={Number(widthInches.toFixed(2))} onChange={(event) => updateWidth(Number(event.target.value))} /></label>
@@ -630,9 +660,7 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
 
           {activeStep === 3 && (
             <div className={styles.stepPanel}>
-              <StepHeading number="04" title="Prepare the studio request." copy="The estimate updates with quantity. Tell us who the proof belongs to; no payment is taken here." />
-              <label className={styles.quantityField}><span>Quantity</span><div><button type="button" onClick={() => setQuantity((value) => Math.max(1, value - 1))}>−</button><input type="number" min="1" max="5000" value={quantity} onChange={(event) => setQuantity(Math.max(1, Math.min(5000, Number(event.target.value))))} /><button type="button" onClick={() => setQuantity((value) => Math.min(5000, value + 1))}>+</button></div></label>
-              <div className={styles.quantityPresets}>{[1, 12, 24, 48, 100, 250].map((amount) => <button key={amount} type="button" className={quantity === amount ? styles.selectedPill : ""} onClick={() => setQuantity(amount)} aria-pressed={quantity === amount}>{amount}</button>)}</div>
+              <StepHeading number="04" title="Prepare the studio request." copy={`Review the ${product.name} order for ${quantity} units, then add the contact who will receive proofs and secure order updates. No payment is taken here.`} />
               <fieldset className={styles.projectTypes}>
                 <legend>This project is for</legend>
                 {([
@@ -642,7 +670,7 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
               <div className={styles.twoColumns}>
                 <label className={styles.field}><span>Your name *</span><input autoComplete="name" value={customer.name} onChange={(event) => setCustomer((current) => ({ ...current, name: event.target.value }))} /></label>
                 <label className={styles.field}><span>Email *</span><input type="email" autoComplete="email" value={customer.email} onChange={(event) => setCustomer((current) => ({ ...current, email: event.target.value }))} /></label>
-                <label className={styles.field}><span>Phone</span><input type="tel" autoComplete="tel" value={customer.phone} onChange={(event) => setCustomer((current) => ({ ...current, phone: event.target.value }))} /></label>
+                <label className={styles.field}><span>Mobile number *</span><input type="tel" inputMode="tel" autoComplete="tel" value={customer.phone} onChange={(event) => setCustomer((current) => ({ ...current, phone: event.target.value }))} /><small className={styles.fieldHint}>Used for secure order access after submission.</small></label>
                 <label className={styles.field}><span>Organization</span><input autoComplete="organization" value={customer.organization} onChange={(event) => setCustomer((current) => ({ ...current, organization: event.target.value }))} /></label>
               </div>
               <label className={styles.field}><span>Notes for the atelier</span><textarea rows={4} value={customer.notes} onChange={(event) => setCustomer((current) => ({ ...current, notes: event.target.value }))} placeholder="Material, deadline, sizing mix, or anything the studio should know." /></label>
@@ -669,7 +697,8 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
             <div className={styles.previewHeader}><span>Live studio proof</span><span><span className={styles.liveDot} /> 3D preview</span></div>
             <div className={styles.previewStage}>
               <EmbroideryPreview3D
-                textureUrl={textureUrl}
+                textureUrl={textureMaps?.colorUrl ?? null}
+                heightTextureUrl={textureMaps?.heightUrl ?? null}
                 garmentColor={garmentColor}
                 productCategory={product.category}
                 widthInches={widthInches}
@@ -679,10 +708,17 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
                 rotationDegrees={rotationDegrees}
                 densityMm={densityMm}
                 threadWeight={threadWeight}
+                zoom={previewZoom}
+                onZoomChange={setPreviewZoom}
                 className={styles.threePreview}
               />
-              {!textureUrl && <div className={styles.previewEmpty}>{processing ? <LoaderCircle className={styles.spinner} size={22} /> : <Maximize2 size={22} />}<span>{processing ? "Translating artwork into thread…" : "Your thread proof will appear here"}</span></div>}
-              <span className={styles.previewHint}>Drag to rotate · scroll to inspect</span>
+              {!textureMaps?.colorUrl && <div className={styles.previewEmpty}>{processing ? <LoaderCircle className={styles.spinner} size={22} /> : <Maximize2 size={22} />}<span>{processing ? "Translating artwork into thread…" : "Your thread proof will appear here"}</span></div>}
+              <div className={styles.zoomControls} aria-label="Preview zoom controls">
+                <button type="button" aria-label="Zoom out" disabled={previewZoom <= 0.65} onClick={() => setPreviewZoom((value) => Math.max(0.65, Number((value - 0.25).toFixed(2))))}><ZoomOut size={14} /></button>
+                <button type="button" aria-label="Reset zoom" onClick={() => setPreviewZoom(1)}>{Math.round(previewZoom * 100)}%</button>
+                <button type="button" aria-label="Zoom in" disabled={previewZoom >= 2.75} onClick={() => setPreviewZoom((value) => Math.min(2.75, Number((value + 0.25).toFixed(2))))}><ZoomIn size={14} /></button>
+              </div>
+              <span className={styles.previewHint}>Drag to rotate · scroll or use controls to zoom</span>
             </div>
             <div className={styles.proofMeta}>
               <div><span>Object</span><strong>{product.name}</strong></div>

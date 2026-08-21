@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizePhoneNumber } from "@/lib/portal/phone";
 
 const hexColor = z.string().regex(/^#[0-9A-F]{6}$/i, "Expected a six-digit hex color");
 
@@ -55,7 +56,10 @@ export const configuratorSubmissionSchema = z.object({
   customer: z.object({
     name: z.string().trim().min(2).max(200),
     email: z.string().trim().email().max(320),
-    phone: z.string().trim().max(80).optional().default(""),
+    phone: z.string().trim().min(7).max(40).refine(
+      (value) => normalizePhoneNumber(value) !== null,
+      "Enter a mobile number including its area code",
+    ),
     organization: z.string().trim().max(240).optional().default(""),
     consent: z.literal(true),
   }),

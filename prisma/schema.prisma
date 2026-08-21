@@ -100,6 +100,8 @@ model Client {
   samples                 Sample[]
   monogramProfiles        MonogramProfile[]
   configuratorSubmissions ConfiguratorSubmission[]
+  portalSessions          CustomerPortalSession[]
+  portalLoginChallenges   CustomerPortalLoginChallenge[]
 }
 
 // ---------------------------------------------------------------------------
@@ -821,6 +823,40 @@ model ConfiguratorSubmission {
   @@unique([designVersionId])
   @@index([organizationId, createdAt])
   @@index([clientId, createdAt])
+}
+
+/// Short-lived, opaque challenge used while a customer proves possession of
+/// the phone number already attached to their CRM account.
+model CustomerPortalLoginChallenge {
+  id              String    @id @default(cuid())
+  clientId        String?
+  client          Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  phoneHash       String
+  ipHash          String
+  returnReference String?
+  attempts        Int       @default(0)
+  expiresAt       DateTime
+  verifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([phoneHash, createdAt])
+  @@index([ipHash, createdAt])
+  @@index([expiresAt])
+}
+
+/// Revocable customer portal session. Only a SHA-256 digest is persisted;
+/// the bearer token itself remains in an HTTP-only cookie.
+model CustomerPortalSession {
+  id         String   @id @default(cuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([clientId, expiresAt])
+  @@index([expiresAt])
 }
 
 enum SampleStatus {

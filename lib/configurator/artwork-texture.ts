@@ -2,6 +2,11 @@ import { hexToRgb } from "@/lib/color";
 import type { PixelBuffer } from "@/lib/services/image-processing/types";
 import type { BorderStyle, ThreadWeightChoice } from "./pricing";
 
+export interface ThreadTextureMaps {
+  colorUrl: string;
+  heightUrl: string;
+}
+
 export function prepareArtworkBuffer(source: PixelBuffer, removeLightBackground: boolean): PixelBuffer {
   const data = new Uint8ClampedArray(source.data);
   if (removeLightBackground) {
@@ -14,7 +19,7 @@ export function prepareArtworkBuffer(source: PixelBuffer, removeLightBackground:
   return { data, width: source.width, height: source.height };
 }
 
-export function createThreadTextureDataUrl({
+export function createThreadTextureMaps({
   buffer,
   clusters,
   targetHexes,
@@ -32,7 +37,7 @@ export function createThreadTextureDataUrl({
   borderWidthMm: number;
   densityMm: number;
   threadWeight: ThreadWeightChoice;
-}) {
+}): ThreadTextureMaps {
   const recolored = new Uint8ClampedArray(buffer.data);
   const palette = targetHexes.map(hexToRgb);
   for (let pixel = 0, offset = 0; pixel < clusters.length; pixel++, offset += 4) {
@@ -101,5 +106,42 @@ export function createThreadTextureDataUrl({
     context.stroke();
   }
   context.globalCompositeOperation = "source-over";
-  return canvas.toDataURL("image/png");
+
+  // A dedicated grayscale height map gives the WebGL material actual stitch
+  // relief instead of treating the colored artwork as a shallow bump map.
+  const heightCanvas = document.createElement("canvas");
+  heightCanvas.width = canvas.width;
+  heightCanvas.height = canvas.height;
+  const heightContext = heightCanvas.getContext("2d")!;
+  heightContext.drawImage(canvas, 0, 0);
+  heightContext.globalCompositeOperation = "source-in";
+  heightContext.fillStyle = "#8c8c8c";
+  heightContext.fillRect(0, 0, heightCanvas.width, heightCanvas.height);
+  heightContext.globalCompositeOperation = "source-atop";
+
+  const ridgeWidth = threadWeight === "W30" ? 2.8 : threadWeight === "W60" ? 1.25 : 2;
+  heightContext.lineCap = "round";
+  heightContext.lineWidth = ridgeWidth;
+  heightContext.strokeStyle = "rgba(255,255,255,0.94)";
+  for (let x = -heightCanvas.height; x < heightCanvas.width + heightCanvas.height; x += spacing) {
+    heightContext.beginPath();
+    heightContext.moveTo(x, 0);
+    heightContext.lineTo(x + heightCanvas.height, heightCanvas.height);
+    heightContext.stroke();
+  }
+
+  heightContext.lineWidth = Math.max(0.75, ridgeWidth * 0.45);
+  heightContext.strokeStyle = "rgba(20,20,20,0.72)";
+  for (let x = -heightCanvas.height + spacing * 0.58; x < heightCanvas.width + heightCanvas.height; x += spacing) {
+    heightContext.beginPath();
+    heightContext.moveTo(x, 0);
+    heightContext.lineTo(x + heightCanvas.height, heightCanvas.height);
+    heightContext.stroke();
+  }
+  heightContext.globalCompositeOperation = "source-over";
+
+  return {
+    colorUrl: canvas.toDataURL("image/png"),
+    heightUrl: heightCanvas.toDataURL("image/png"),
+  };
 }
