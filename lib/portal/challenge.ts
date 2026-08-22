@@ -13,7 +13,7 @@ export function hashPortalIdentifier(value: string) {
   return crypto.createHmac("sha256", portalSecret()).update(value).digest("hex");
 }
 
-export async function createPortalLoginChallenge({
+export async function createPortalAccessAttempt({
   phone,
   ipAddress,
   returnReference,
@@ -41,10 +41,10 @@ export async function createPortalLoginChallenge({
       ],
     },
     orderBy: { updatedAt: "desc" },
-    select: { id: true, phone: true, contacts: { where: { phone: { in: candidates } }, take: 1, select: { phone: true } } },
+    select: { id: true },
   });
 
-  const challenge = await prisma.customerPortalLoginChallenge.create({
+  const attempt = await prisma.customerPortalLoginChallenge.create({
     data: {
       clientId: client?.id ?? null,
       phoneHash,
@@ -54,11 +54,8 @@ export async function createPortalLoginChallenge({
     },
   });
 
-  const matchingClientPhone = client?.phone && candidates.includes(client.phone) ? client.phone : null;
-
   return {
     rateLimited: false as const,
-    challenge,
-    deliveryPhone: matchingClientPhone ?? client?.contacts[0]?.phone ?? null,
+    attempt,
   };
 }

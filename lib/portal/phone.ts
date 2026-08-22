@@ -3,7 +3,7 @@ const E164_PHONE = /^\+[1-9]\d{7,14}$/;
 /**
  * Normalize common North American input while preserving already-valid
  * international E.164 numbers. Extensions are intentionally not accepted for
- * SMS authentication.
+ * portal account matching.
  */
 export function normalizePhoneNumber(input: string): string | null {
   const trimmed = input.trim();
@@ -18,16 +18,6 @@ export function normalizePhoneNumber(input: string): string | null {
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
   return null;
-}
-
-export function maskPhoneNumber(phone: string): string {
-  const normalized = normalizePhoneNumber(phone);
-  if (!normalized) return "your phone";
-  const digits = normalized.slice(1);
-  if (digits.length === 11 && digits.startsWith("1")) {
-    return `(***) ***-${digits.slice(-4)}`;
-  }
-  return `+${digits.slice(0, Math.max(1, digits.length - 6))} ••• ••${digits.slice(-4)}`;
 }
 
 export function phoneLookupCandidates(input: string): string[] {

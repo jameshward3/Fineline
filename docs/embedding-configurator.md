@@ -71,10 +71,6 @@ embedding. The repository’s marketing CTAs already use that route.
 | `STITCHOS_INTAKE_SECRET` | server, optional | Trusted server-to-server intake; never expose to browser code |
 | `PORTAL_AUTH_SECRET` | server | Independent HMAC key for phone-login rate-limit identifiers |
 | `PORTAL_SESSION_DAYS` | server, optional | Customer session lifetime, 1–90 days; defaults to 30 |
-| `TWILIO_VERIFY_SERVICE_SID` | server | Twilio Verify service used to deliver one-time SMS codes |
-| `TWILIO_API_KEY` + `TWILIO_API_SECRET` | server | Recommended Twilio production credentials |
-| `TWILIO_ACCOUNT_SID` + `TWILIO_AUTH_TOKEN` | server, fallback | Supported fallback when an API key is not configured |
-| `PORTAL_DEV_OTP` | local only | Visible local verification code; ignored in production |
 
 No Supabase service-role or anonymous key is needed in the browser. All CRM
 writes go through Prisma on the server.
@@ -93,23 +89,25 @@ npm run build
 Migration `20260821133000_public_configurator` adds the structured
 `ConfiguratorSubmission` record and links it to the normal StitchOS client,
 opportunity, design/version, and job records. It does not alter or delete
-existing CRM data. Migration `20260821153000_customer_portal` adds short-lived
-phone challenges and revocable hashed portal sessions linked to the existing
-`Client` record.
+existing CRM data. Migration `20260821153000_customer_portal` adds rate-limited
+phone access attempts and revocable hashed portal sessions linked to the
+existing `Client` record.
 
 ## Customer order portal
 
-- `/orders/sign-in` requests a one-time code for a phone already attached to a
-  CRM client or contact. Unknown numbers receive the same generic response and
-  no SMS, reducing account enumeration and messaging abuse.
-- `/orders` lists the verified client's current and past orders.
+- `/orders/sign-in` accepts a phone already attached to a CRM client or contact
+  and opens a revocable customer session without a password or SMS code.
+- `/orders` lists the matched client's current and past orders.
 - `/orders/[reference]` shows artwork, product/placement, thread selections,
   price estimate, and live StitchOS production status.
-- Submission redirects to `/orders/sign-in?order=<job-number>`. After phone
-  verification, the customer lands directly on that order.
-- The challenge API enforces database-backed limits of four requests per phone
+- Submission redirects to `/orders/sign-in?order=<job-number>`. After entering
+  the matching phone number, the customer lands directly on that order.
+- The access API enforces database-backed limits of four requests per phone
   and ten per IP in fifteen minutes. Add a Vercel Firewall limit as a second
   layer in production.
+- Phone-only access does not prove possession of the number. Anyone who knows a
+  customer's phone number can view that customer's portal orders; do not place
+  payment details or other highly sensitive information in the customer view.
 
 ## Production controls
 
@@ -121,7 +119,7 @@ phone challenges and revocable hashed portal sessions linked to the existing
    requests per IP per 15 minutes).
 3. Keep the route’s `frame-ancestors` list in `next.config.mjs` synchronized
    with the production host domains.
-4. Run one end-to-end submission after deployment, verify the SMS code, and
+4. Run one end-to-end submission after deployment, enter the matching phone, and
    confirm the linked CRM opportunity, design, artwork asset, job item, notes,
    estimate, portal order, and previous-order history.
 5. Treat the displayed price as an estimate. The API recalculates it using

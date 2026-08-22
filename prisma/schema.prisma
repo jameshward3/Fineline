@@ -825,8 +825,8 @@ model ConfiguratorSubmission {
   @@index([clientId, createdAt])
 }
 
-/// Short-lived, opaque challenge used while a customer proves possession of
-/// the phone number already attached to their CRM account.
+/// Rate-limited phone access attempt linked to a customer portal session.
+/// Retains the original table name for migration compatibility.
 model CustomerPortalLoginChallenge {
   id              String    @id @default(cuid())
   clientId        String?

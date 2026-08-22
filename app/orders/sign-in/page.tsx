@@ -21,7 +21,7 @@ export default async function CustomerSignInPage({
           <p>Fine Line customer studio</p>
           <blockquote>“A clear view from first thread to finished piece.”</blockquote>
         </div>
-        <span>Secure phone verification · No password to remember</span>
+        <span>Phone-number access · No password to remember</span>
       </aside>
       <section className={styles.signInContent}>
         <div className={styles.signInTopline}>Order concierge <span>Fine Line Studio</span></div>
