@@ -7,7 +7,7 @@
  */
 
 export const brand = {
-  companyName: "Fine Line Studio",
+  companyName: "Fine Ligne Studio",
   productName: "STITCH OS",
   productSubtitle: "Artwork-to-Embroidery Production System",
   tagline: "Imagined luxury, actualized.",
@@ -22,21 +22,21 @@ export const brand = {
   favicon: "/branding/favicon.svg",
 
   colors: {
-    primary: "#C9A227", // antique gold — primary actions, active states
-    secondary: "#F2EDE1", // ivory — restrained highlight accents
-    accent: "#22C55E", // production green — success / ready states
-    ink: "#1A1A1A", // brand mark ink — print / light-background contexts
-    paper: "#F7F3EC", // brand mark ground — print / light-background contexts
+    primary: "#C9A227",
+    secondary: "#F2EDE1",
+    accent: "#22C55E",
+    ink: "#1A1A1A",
+    paper: "#F7F3EC",
   },
 
   loginScreen: {
-    heading: "Fine Line Studio",
+    heading: "Fine Ligne Studio",
     subheading: "STITCH OS — Artwork-to-Embroidery Production System",
     footer: "Internal production platform — authorized personnel only.",
   },
 
   export: {
-    productionSheetFooter: "Prepared by Fine Line Studio with STITCH OS — Artwork-to-Embroidery Production System",
+    productionSheetFooter: "Prepared by Fine Ligne Studio with STITCH OS — Artwork-to-Embroidery Production System",
     watermark: null as string | null,
   },
 } as const;
