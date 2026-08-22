@@ -10,19 +10,13 @@ import { forwardRef } from "react";
  * of these static shapes; nothing here is ever swapped or cross-faded at
  * the DOM level for the needle/thread themselves).
  *
- * The needle + thread gesture reproduces the actual Fine Line Studio mark
+ * The needle + thread gesture reproduces the actual Fine Ligne Studio mark
  * (see public/branding/mark.svg) rather than inventing a new symbol.
  */
 
 /** The needle: a tapered, filled silhouette with a cut eye near the top.
  *  Local space: x in [-6,6], y in [-70,70], point at +y, eye near -y. */
-export function NeedleShape({
-  id,
-  className,
-}: {
-  id: string;
-  className?: string;
-}) {
+export function NeedleShape({ id, className }: { id: string; className?: string }) {
   const maskId = `${id}-eye-mask`;
   return (
     <g className={className}>
@@ -30,61 +24,23 @@ export function NeedleShape({
         <rect x="-40" y="-90" width="80" height="180" fill="white" />
         <ellipse cx="0" cy="-50" rx="2.1" ry="5.4" fill="black" />
       </mask>
-      <path
-        d="M -4 -70 C -5.4 -64 -5.2 58 -3.1 65.5 L 0 70.5 L 3.1 65.5 C 5.2 58 5.4 -64 4 -70 C 4 -72.6 -4 -72.6 -4 -70 Z"
-        mask={`url(#${maskId})`}
-      />
+      <path d="M -4 -70 C -5.4 -64 -5.2 58 -3.1 65.5 L 0 70.5 L 3.1 65.5 C 5.2 58 5.4 -64 4 -70 C 4 -72.6 -4 -72.6 -4 -70 Z" mask={`url(#${maskId})`} />
     </g>
   );
 }
 
-/** Simplified needle bar used for the 14 machine-head siblings — same
- *  proportions, no eye cut (they read at small scale, detail is unnecessary). */
 export function NeedleBarShape({ className }: { className?: string }) {
-  return (
-    <path
-      className={className}
-      d="M -3.4 -58 C -4.4 -53 -4.2 48 -2.6 54 L 0 58 L 2.6 54 C 4.2 48 4.4 -53 3.4 -58 C 3.4 -60.2 -3.4 -60.2 -3.4 -58 Z"
-    />
-  );
+  return <path className={className} d="M -3.4 -58 C -4.4 -53 -4.2 48 -2.6 54 L 0 58 L 2.6 54 C 4.2 48 4.4 -53 3.4 -58 C 3.4 -60.2 -3.4 -60.2 -3.4 -58 Z" />;
 }
 
-/** The thread: a signature-like flourish that emerges from the needle's
- *  eye, sweeps left across the top and curls into a small loop underneath
- *  — the actual Fine Line Studio mark's gesture. Draws with pathLength=1
- *  so callers can scrub strokeDashoffset 1 -> 0 without measuring geometry. */
-export const ThreadSwirl = forwardRef<
-  SVGPathElement,
-  { id: string; className?: string; style?: React.CSSProperties }
->(function ThreadSwirl({ id, className, style }, ref) {
-  return (
-    <path
-      ref={ref}
-      id={id}
-      className={className}
-      style={style}
-      pathLength={1}
-      fill="none"
-      strokeLinecap="round"
-      d="M 0 -50 C -18 -78 -70 -82 -96 -55 C -118 -32 -110 -6 -82 2 C -60 8 -46 -6 -58 -20 C -66 -30 -80 -26 -78 -14"
-    />
-  );
-});
+/** The actual Fine Ligne Studio thread gesture. */
+export const ThreadSwirl = forwardRef<SVGPathElement, { id: string; className?: string; style?: React.CSSProperties }>(
+  function ThreadSwirl({ id, className, style }, ref) {
+    return <path ref={ref} id={id} className={className} style={style} pathLength={1} fill="none" strokeLinecap="round" d="M 0 -50 C -18 -78 -70 -82 -96 -55 C -118 -32 -110 -6 -82 2 C -60 8 -46 -6 -58 -20 C -66 -30 -80 -26 -78 -14" />;
+  },
+);
 
-/** Compact monogram glyph = needle + thread composed together, used
- *  everywhere the "finished mark" needs to reappear small (stitched onto
- *  fabric, on the shirt chest, in a nav lockup). Shares the exact geometry
- *  of NeedleShape/ThreadSwirl at a fixed relative scale so every
- *  appearance of the mark across the site is the same shape, just resized.
- *  Local space roughly x:[-34,3] y:[-25,20] once scaled — position via an
- *  outer transform on the caller's <g>. */
-export function MonogramGlyph({
-  id,
-  className,
-}: {
-  id: string;
-  className?: string;
-}) {
+export function MonogramGlyph({ id, className }: { id: string; className?: string }) {
   return (
     <g id={id} className={className} fill="none" strokeLinecap="round" strokeWidth={2.6}>
       <g transform="scale(0.29)">
@@ -95,45 +51,21 @@ export function MonogramGlyph({
   );
 }
 
-/** Stacked wordmark — FINE / LINE / STUDIO with flanking hairlines,
- *  matching the proportions of public/branding/logo-badge.svg. */
-export function WordmarkGroup({
-  id,
-  className,
-}: {
-  id: string;
-  className?: string;
-}) {
+/** Stacked wordmark — FINE / LIGNE / STUDIO with flanking hairlines. */
+export function WordmarkGroup({ id, className }: { id: string; className?: string }) {
   return (
     <g id={id} className={className} textAnchor="middle" fill="currentColor">
-      <text x="0" y="0" fontFamily="var(--font-fl-serif)" fontSize="64" fontWeight={500} letterSpacing="0.08em">
-        FINE
-      </text>
-      <text x="0" y="70" fontFamily="var(--font-fl-serif)" fontSize="64" fontWeight={500} letterSpacing="0.08em">
-        LINE
-      </text>
+      <text x="0" y="0" fontFamily="var(--font-fl-serif)" fontSize="64" fontWeight={500} letterSpacing="0.08em">FINE</text>
+      <text x="0" y="70" fontFamily="var(--font-fl-serif)" fontSize="64" fontWeight={500} letterSpacing="0.08em">LIGNE</text>
       <line x1="-64" y1="100" x2="-30" y2="100" strokeWidth="1" stroke="currentColor" />
-      <text x="0" y="105" fontFamily="var(--font-geist-sans)" fontSize="16" letterSpacing="0.42em">
-        STUDIO
-      </text>
+      <text x="0" y="105" fontFamily="var(--font-geist-sans)" fontSize="16" letterSpacing="0.42em">STUDIO</text>
       <line x1="30" y1="100" x2="64" y2="100" strokeWidth="1" stroke="currentColor" />
     </g>
   );
 }
 
-/** Full lockup: icon (needle + thread) composed above the wordmark, at
- *  the proportions of the reference Fine Line Studio mark. Used for the
- *  static logo (nav, footer, favicon-scale contexts) and as the opening
- *  frame of the cinematic intro. */
-export function LogoLockup({
-  id,
-  className,
-  showThread = true,
-}: {
-  id: string;
-  className?: string;
-  showThread?: boolean;
-}) {
+/** Full lockup using the Fine Ligne Studio wordmark. */
+export function LogoLockup({ id, className, showThread = true }: { id: string; className?: string; showThread?: boolean }) {
   return (
     <g id={id} className={className}>
       <g transform="translate(0,-58) scale(0.62)" style={{ strokeWidth: 2.4 }}>
@@ -145,49 +77,14 @@ export function LogoLockup({
   );
 }
 
-/** The embroidery head housing: a rounded frame behind the needle row with
- *  a thread-guide bar and one small cone per needle. `count` needle slots,
- *  `spacing` px between them, centered at local origin. */
-export function MachineHousing({
-  id,
-  count = 15,
-  spacing = 42,
-  className,
-}: {
-  id: string;
-  count?: number;
-  spacing?: number;
-  className?: string;
-}) {
+export function MachineHousing({ id, count = 15, spacing = 42, className }: { id: string; count?: number; spacing?: number; className?: string }) {
   const width = spacing * (count - 1) + 96;
   const cones = Array.from({ length: count }, (_, i) => i - (count - 1) / 2);
-  const coneTones = [
-    "#B68A3D",
-    "#D9C7A0",
-    "#726A5C",
-    "#181613",
-    "#CBA968",
-  ];
+  const coneTones = ["#B68A3D", "#D9C7A0", "#726A5C", "#181613", "#CBA968"];
   return (
     <g id={id} className={className}>
-      <rect
-        x={-width / 2}
-        y="-128"
-        width={width}
-        height="64"
-        rx="10"
-        className="fill-[url(#machine-metal)] stroke-fl-charcoal"
-        strokeWidth="1.5"
-      />
-      <rect
-        x={-width / 2 + 14}
-        y="-150"
-        width={width - 28}
-        height="18"
-        rx="4"
-        className="fill-[url(#machine-metal)] stroke-fl-charcoal"
-        strokeWidth="1.5"
-      />
+      <rect x={-width / 2} y="-128" width={width} height="64" rx="10" className="fill-[url(#machine-metal)] stroke-fl-charcoal" strokeWidth="1.5" />
+      <rect x={-width / 2 + 14} y="-150" width={width - 28} height="18" rx="4" className="fill-[url(#machine-metal)] stroke-fl-charcoal" strokeWidth="1.5" />
       {cones.map((slot, i) => (
         <g key={i} transform={`translate(${slot * spacing},-176)`}>
           <path d="M -6 18 L 6 18 L 4 -2 L -4 -2 Z" fill={coneTones[i % coneTones.length]} />
@@ -198,20 +95,10 @@ export function MachineHousing({
   );
 }
 
-export function HoopFabricShape({
-  id,
-  className,
-}: {
-  id: string;
-  className?: string;
-}) {
+export function HoopFabricShape({ id, className }: { id: string; className?: string }) {
   return (
     <g id={id} className={className}>
-      <defs>
-        <pattern id={`${id}-weave`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(0)">
-          <path d="M0 0 L6 0 M0 3 L6 3" stroke="#E2D8C2" strokeWidth="0.6" />
-        </pattern>
-      </defs>
+      <defs><pattern id={`${id}-weave`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(0)"><path d="M0 0 L6 0 M0 3 L6 3" stroke="#E2D8C2" strokeWidth="0.6" /></pattern></defs>
       <ellipse cx="0" cy="0" rx="158" ry="158" fill={`url(#${id}-weave)`} className="fill-fl-paper" stroke="none" />
       <ellipse cx="0" cy="0" rx="158" ry="158" fill={`url(#${id}-weave)`} />
       <ellipse cx="0" cy="0" rx="172" ry="172" fill="none" className="stroke-fl-brass" strokeWidth="10" />
@@ -225,53 +112,21 @@ export function HoopFabricShape({
 export function ShirtShape({ id, className }: { id: string; className?: string }) {
   return (
     <g id={id} className={className}>
-      <path
-        d="M -120 -140 L -58 -168 L -20 -140 L 0 -152 L 20 -140 L 58 -168 L 120 -140 L 96 -84 L 60 -100 L 60 190 L -60 190 L -60 -100 L -96 -84 Z"
-        className="fill-fl-paper stroke-fl-charcoal"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
+      <path d="M -120 -140 L -58 -168 L -20 -140 L 0 -152 L 20 -140 L 58 -168 L 120 -140 L 96 -84 L 60 -100 L 60 190 L -60 190 L -60 -100 L -96 -84 Z" className="fill-fl-paper stroke-fl-charcoal" strokeWidth="2" strokeLinejoin="round" />
       <path d="M 0 -152 L -6 190 M 0 -152 L 6 190" className="stroke-fl-line" strokeWidth="1.5" fill="none" />
-      {[-40, 10, 60, 110, 160].map((y, i) => (
-        <circle key={i} cx="0" cy={y} r="2.4" className="fill-fl-ink-faint" />
-      ))}
+      {[-40, 10, 60, 110, 160].map((y, i) => <circle key={i} cx="0" cy={y} r="2.4" className="fill-fl-ink-faint" />)}
     </g>
   );
 }
 
 export function TowelStackShape({ id, className }: { id: string; className?: string }) {
-  return (
-    <g id={id} className={className}>
-      <rect x="-100" y="20" width="200" height="34" rx="6" className="fill-fl-cream stroke-fl-charcoal" strokeWidth="1.5" />
-      <rect x="-92" y="-14" width="184" height="34" rx="6" className="fill-fl-ivory stroke-fl-charcoal" strokeWidth="1.5" />
-      <rect x="-84" y="-48" width="168" height="34" rx="6" className="fill-fl-paper stroke-fl-charcoal" strokeWidth="1.5" />
-    </g>
-  );
+  return <g id={id} className={className}><rect x="-100" y="20" width="200" height="34" rx="6" className="fill-fl-cream stroke-fl-charcoal" strokeWidth="1.5" /><rect x="-92" y="-14" width="184" height="34" rx="6" className="fill-fl-ivory stroke-fl-charcoal" strokeWidth="1.5" /><rect x="-84" y="-48" width="168" height="34" rx="6" className="fill-fl-paper stroke-fl-charcoal" strokeWidth="1.5" /></g>;
 }
 
 export function ToteShape({ id, className }: { id: string; className?: string }) {
-  return (
-    <g id={id} className={className}>
-      <path d="M -66 -70 C -66 -104 66 -104 66 -70" className="stroke-fl-charcoal" strokeWidth="4" fill="none" strokeLinecap="round" />
-      <path
-        d="M -84 -66 L 84 -66 L 72 96 L -72 96 Z"
-        className="fill-fl-cream stroke-fl-charcoal"
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-    </g>
-  );
+  return <g id={id} className={className}><path d="M -66 -70 C -66 -104 66 -104 66 -70" className="stroke-fl-charcoal" strokeWidth="4" fill="none" strokeLinecap="round" /><path d="M -84 -66 L 84 -66 L 72 96 L -72 96 Z" className="fill-fl-cream stroke-fl-charcoal" strokeWidth="2" strokeLinejoin="round" /></g>;
 }
 
 export function NapkinShape({ id, className }: { id: string; className?: string }) {
-  return (
-    <g id={id} className={className}>
-      <path
-        d="M -80 60 L 0 -60 L 80 60 Z"
-        className="fill-fl-paper stroke-fl-charcoal"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-    </g>
-  );
+  return <g id={id} className={className}><path d="M -80 60 L 0 -60 L 80 60 Z" className="fill-fl-paper stroke-fl-charcoal" strokeWidth="1.5" strokeLinejoin="round" /></g>;
 }
