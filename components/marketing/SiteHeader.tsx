@@ -18,7 +18,7 @@ export function SiteHeader() {
           <svg viewBox="-100 -110 200 230" className="h-12 w-12" aria-hidden>
             <LogoLockup id="header-mark" showThread className="text-fl-charcoal" />
           </svg>
-          <span className="font-serif text-sm tracking-[0.16em]">FINE LINE <span className="block text-[7px] tracking-[.45em]">STUDIO</span></span>
+          <span className="font-serif text-sm tracking-[0.16em]">FINE LIGNE <span className="block text-[7px] tracking-[.45em]">STUDIO</span></span>
         </Link>
 
         <nav className="hidden items-center gap-7 lg:flex">
