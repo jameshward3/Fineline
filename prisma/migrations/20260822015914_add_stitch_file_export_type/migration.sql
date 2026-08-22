@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "ExportType" ADD VALUE 'STITCH_FILE_DST';

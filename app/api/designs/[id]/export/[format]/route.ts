@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/current-user";
 import { getStorageService } from "@/lib/services/storage";
+import { getStitchEngineService } from "@/lib/services/stitch-engine";
 import {
   loadExportData,
   generateDesignSvg,
@@ -16,6 +17,7 @@ const EXPORT_TYPE_BY_FORMAT: Record<string, ExportType> = {
   json: "JSON",
   pdf: "PDF_PRODUCTION_SHEET",
   zip: "MASTER_PACKAGE_ZIP",
+  dst: "STITCH_FILE_DST",
 };
 
 const CONTENT_TYPE_BY_FORMAT: Record<string, string> = {
@@ -23,7 +25,11 @@ const CONTENT_TYPE_BY_FORMAT: Record<string, string> = {
   json: "application/json",
   pdf: "application/pdf",
   zip: "application/zip",
+  dst: "application/x-dst",
 };
+
+/** Generic hoop capacity used for the oversized-design warning — verify against the selected machine's actual hoop before production. */
+const DEFAULT_HOOP_MM = 200;
 
 export async function GET(
   _req: NextRequest,
@@ -71,6 +77,23 @@ export async function GET(
     case "zip":
       fileBuffer = await generateMasterPackageZip(data);
       fileName = `${fileBase}-institch-package.zip`;
+      break;
+    case "dst":
+      try {
+        const result = await getStitchEngineService().generate({
+          designVersionId: latestVersion.id,
+          format: "DST",
+          hoopWidthMm: DEFAULT_HOOP_MM,
+          hoopHeightMm: DEFAULT_HOOP_MM,
+        });
+        fileBuffer = result.fileBuffer;
+        fileName = `${fileBase}.dst`;
+      } catch (err) {
+        return NextResponse.json(
+          { error: err instanceof Error ? err.message : "Stitch file generation failed" },
+          { status: 422 }
+        );
+      }
       break;
     default:
       return NextResponse.json({ error: "Unknown export format" }, { status: 400 });

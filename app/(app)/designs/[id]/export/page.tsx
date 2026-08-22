@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { FileText, Image as ImageIcon, FileJson, Package, ArrowLeft, type LucideIcon } from "lucide-react";
+import { FileText, Image as ImageIcon, FileJson, Package, ArrowLeft, Cog, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Panel, PanelHeader } from "@/components/ui/panel";
@@ -12,6 +12,7 @@ const EXPORT_TYPE_LABEL: Record<string, string> = {
   PDF_PRODUCTION_SHEET: "PDF Production Sheet",
   JSON: "JSON",
   MASTER_PACKAGE_ZIP: "Master Package (ZIP)",
+  STITCH_FILE_DST: "Stitch File (.dst)",
 };
 
 export default async function DesignExportPage({ params }: { params: Promise<{ id: string }> }) {
@@ -61,6 +62,18 @@ export default async function DesignExportPage({ params }: { params: Promise<{ i
           <ExportButton href={`/api/designs/${design.id}/export/pdf`} icon={FileText} label="Production Sheet (.pdf)" />
           <ExportButton href={`/api/designs/${design.id}/export/json`} icon={FileJson} label="Production Metadata (.json)" />
         </div>
+      </Panel>
+
+      <Panel>
+        <PanelHeader
+          title="Stitch File"
+          subtitle="Machine-ready DST, generated directly from this design's stitch-type assignments"
+        />
+        <ExportButton href={`/api/designs/${design.id}/export/dst`} icon={Cog} label="Download Stitch File (.dst)" />
+        <p className="text-xs text-ink-faint mt-2">
+          Automatic first-pass digitizing for clean, simple artwork — not a substitute for expert review on
+          detail-dense designs. Generation is blocked if any object still needs a stitch type assigned.
+        </p>
       </Panel>
 
       <Panel>

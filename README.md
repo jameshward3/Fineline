@@ -28,10 +28,17 @@ Seeded demo login: `admin@stitchos.dev` / `stitchos-dev` (also `designer@`,
 
 - **Image processing / vectorization / stitch-engine / AI assistant / export**
   live behind interfaces in `lib/services/*` so each engine can be swapped or
-  upgraded independently. `lib/services/stitch-engine` is an explicit
-  boundary for a future DST/PES/EXP/JEF stitch-generation engine — it is not
-  implemented; STITCH OS currently prepares artwork for a human digitizer in
-  InStitch, not raw stitch files.
+  upgraded independently. `lib/services/stitch-engine` generates real Tajima
+  DST stitch files directly from a design's VectorObjects and their assigned
+  stitch types (running/satin/tatami), sequenced and color-change-separated
+  in sewing order — an original TypeScript implementation of the public DST
+  format, not a port of any existing embroidery library. It's a
+  first-generation automatic digitizer for clean, simple artwork, not a
+  replacement for expert hand-digitizing of complex designs — generation is
+  blocked (not silently skipped) if any object still needs its stitch type
+  assigned. PES/EXP/JEF/XXX are defined on the interface but not yet
+  implemented. STITCH OS still also prepares separated, annotated artwork
+  for a human digitizer in InStitch for anything that needs one.
 - **Object/blob storage** is behind `lib/services/storage`, with a local
   filesystem implementation for development.
 - **Branding** is centralized in `lib/branding.ts` — nothing else hard-codes

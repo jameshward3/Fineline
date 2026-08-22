@@ -566,6 +566,7 @@ enum ExportType {
   PDF_PRODUCTION_SHEET
   JSON
   MASTER_PACKAGE_ZIP
+  STITCH_FILE_DST
 }
 
 model Export {
