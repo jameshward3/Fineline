@@ -25,15 +25,11 @@ const flSerif = Fraunces({
 export const metadata: Metadata = {
   title: `${brand.companyName} — Imagined Luxury. Actualized.`,
   description:
-    "Fine Line Studio transforms an idea, a monogram, a crest, an identity into thread and fabric. Institutional uniforms, corporate gifting, and luxury monogramming, embroidered with precision.",
+    "Fine Ligne Studio transforms an idea, a monogram, a crest, an identity into thread and fabric. Institutional uniforms, corporate gifting, and luxury monogramming, embroidered with precision.",
   icons: { icon: brand.favicon },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${flSerif.variable}`}>
       <body className="antialiased">{children}</body>
