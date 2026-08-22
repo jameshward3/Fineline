@@ -92,17 +92,6 @@ export async function main() {
       },
     }),
     prisma.user.upsert({
-      where: { email: "jameshward3@gmail.com" },
-      update: { passwordHash: await bcrypt.hash("tkVwGbPFRcbxSn", 10) },
-      create: {
-        organizationId: org.id,
-        email: "jameshward3@gmail.com",
-        passwordHash: await bcrypt.hash("tkVwGbPFRcbxSn", 10),
-        name: "James Ward",
-        role: "ADMIN",
-      },
-    }),
-    prisma.user.upsert({
       where: { email: "james@househeywood.com" },
       update: { passwordHash: await bcrypt.hash("Dudedad123", 10) },
       create: {
@@ -913,7 +902,7 @@ export async function main() {
 
   console.log("Seed complete:", {
     org: org.name,
-    users: 7,
+    users: 6,
     threadColors: PALETTE_ORDER.length,
     machine: machine.name,
     products: 6,
