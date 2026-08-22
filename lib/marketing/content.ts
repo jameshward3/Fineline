@@ -1,5 +1,5 @@
 /**
- * Content + navigation for the public Fine Line Studio marketing site.
+ * Content + navigation for the public Fine Ligne Studio marketing site.
  * Kept separate from `lib/branding.ts`, which governs the internal
  * STITCH OS production tool's identity.
  */

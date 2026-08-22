@@ -5,7 +5,7 @@ import { PageShell } from "@/components/marketing/PageShell";
 import { TowelStackShape, ToteShape, ShirtShape } from "@/components/story/marks";
 
 export const metadata: Metadata = {
-  title: "Collections — Fine Line Studio",
+  title: "Collections — Fine Ligne Studio",
   description: "Six ways to begin — institutional, corporate, monogram, home, bags, and apparel.",
 };
 

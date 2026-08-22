@@ -4,7 +4,7 @@ import { CategoryDetail } from "@/components/marketing/CategoryDetail";
 import { ToteShape } from "@/components/story/marks";
 
 export const metadata: Metadata = {
-  title: "Corporate Gifting — Fine Line Studio",
+  title: "Corporate Gifting — Fine Ligne Studio",
   description: "Recipient-personalized gifting at scale, for teams who want the scale to be invisible.",
 };
 

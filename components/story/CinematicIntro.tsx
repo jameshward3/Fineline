@@ -315,7 +315,7 @@ function PlayingIntro({ onFinish, jumpToHome }: { onFinish: () => void; jumpToHo
   }, []);
 
   return (
-    <section ref={sectionRef} className="relative bg-fl-ivory" aria-label="Fine Line Studio — introduction">
+    <section ref={sectionRef} className="relative bg-fl-ivory" aria-label="Fine Ligne Studio — introduction">
       <div ref={stageRef} className="sticky top-0 h-[100svh] w-full overflow-hidden bg-fl-ivory">
         <svg
           viewBox="0 0 1200 800"
@@ -428,7 +428,7 @@ function PlayingIntro({ onFinish, jumpToHome }: { onFinish: () => void; jumpToHo
                 onClick={runTransition}
                 className="px-8 py-3.5 font-sans text-xs uppercase tracking-[0.28em] text-fl-charcoal underline decoration-fl-ink-faint underline-offset-8 transition-colors hover:decoration-fl-charcoal"
               >
-                Explore Fine Line
+                Explore Fine Ligne
               </button>
             </div>
             <p className="font-serif italic text-sm text-fl-ink-muted">Bring us an idea. We&rsquo;ll help make it real.</p>
@@ -577,7 +577,7 @@ function ReducedMotionIntro({ onFinish, jumpToHome }: { onFinish: () => void; ju
               }}
               className="px-8 py-3.5 font-sans text-xs uppercase tracking-[0.28em] text-fl-charcoal underline decoration-fl-ink-faint underline-offset-8"
             >
-              Explore Fine Line
+              Explore Fine Ligne
             </button>
           </div>
           <p className="font-serif italic text-sm text-fl-ink-muted">Bring us an idea. We&rsquo;ll help make it real.</p>

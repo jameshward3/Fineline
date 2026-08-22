@@ -23,14 +23,17 @@ function LoginForm() {
     <div className="dark min-h-screen flex items-center justify-center bg-canvas px-4 font-sans">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <Image
-            src={brand.logoBadge}
-            alt={brand.companyName}
-            width={165}
-            height={180}
-            className="mb-5 rounded-lg shadow-panel"
-            priority
-          />
+          <div className="relative mb-5 h-[112px] w-[260px] overflow-hidden shadow-panel">
+            <Image
+              src={brand.logoDark}
+              alt={brand.companyName}
+              fill
+              sizes="260px"
+              className="object-contain"
+              priority
+            />
+            <span className="pointer-events-none absolute left-0 top-0 h-4 w-[70px] bg-gradient-to-r from-[#292929] via-[#292929] to-transparent" />
+          </div>
           <p className="text-sm text-ink-muted">{brand.loginScreen.subheading}</p>
         </div>
 

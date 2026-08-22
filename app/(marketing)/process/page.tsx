@@ -5,8 +5,8 @@ import { PageShell } from "@/components/marketing/PageShell";
 import { NeedleShape, ThreadSwirl } from "@/components/story/marks";
 
 export const metadata: Metadata = {
-  title: "Our Process — Fine Line Studio",
-  description: "From idea to object: how Fine Line Studio translates a mark into thread.",
+  title: "Our Process — Fine Ligne Studio",
+  description: "From idea to object: how Fine Ligne Studio translates a mark into thread.",
 };
 
 export default function ProcessPage() {
