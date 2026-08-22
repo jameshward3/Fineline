@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
-import { Fraunces } from "next/font/google";
+import { Fraunces, Inter, Playfair_Display } from "next/font/google";
 import { brand } from "@/lib/branding";
 import "./globals.css";
 
@@ -21,6 +21,19 @@ const flSerif = Fraunces({
   style: ["normal", "italic"],
   display: "swap",
 });
+const flDisplay = Playfair_Display({
+  subsets: ["latin"],
+  variable: "--font-fl-display",
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
+const flSans = Inter({
+  subsets: ["latin"],
+  variable: "--font-fl-sans",
+  weight: ["300", "400", "500", "600"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: `${brand.companyName} — Imagined Luxury. Actualized.`,
@@ -35,7 +48,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} ${flSerif.variable}`}>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} ${flSerif.variable} ${flDisplay.variable} ${flSans.variable}`}
+    >
       <body className="antialiased">{children}</body>
     </html>
   );

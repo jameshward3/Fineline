@@ -81,6 +81,7 @@
 }
 
 .intro h1,
+.intro h2,
 .successPanel h1 {
   margin: 9px 0 0;
   font-family: var(--font-fl-serif), "Playfair Display", Georgia, serif;

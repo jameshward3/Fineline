@@ -1,70 +1,64 @@
 import Link from "next/link";
+import { BrandWordmark } from "@/components/marketing/BrandWordmark";
 import { primaryNav, utilityNav } from "@/lib/marketing/content";
-import { LogoLockup } from "@/components/story/marks";
+
+const studioLinks = [...utilityNav, { label: "About", href: "/about" }];
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-fl-line bg-fl-charcoal text-fl-cream">
-      <div className="mx-auto grid max-w-7xl gap-12 px-5 py-16 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
-        <div>
-          <svg viewBox="-100 -110 200 230" className="h-12 w-12" aria-hidden>
-            <LogoLockup id="footer-mark" className="text-fl-cream" />
-          </svg>
-          <p className="mt-5 max-w-xs font-serif italic text-sm text-fl-champagne">
-            Imagined Luxury. Actualized.
-          </p>
+    <footer className="border-t border-fl-charcoal/10 bg-fl-paper text-[#403d38]">
+      <div className="mx-auto max-w-[1440px] px-6 pb-16 pt-20 sm:px-10 lg:px-16 lg:pb-[90px] lg:pt-24">
+        <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] lg:gap-16">
+          <div>
+            <BrandWordmark />
+            <p className="mt-6 font-display text-[15px] leading-6">Imagined Luxury. Actualized.</p>
+          </div>
+
+          <FooterColumn title="Explore" links={primaryNav} />
+          <FooterColumn title="Studio" links={studioLinks} />
+
+          <div>
+            <h2 className="font-flsans text-[10px] font-medium uppercase tracking-[0.2em] text-[#8b8276]">
+              Correspondence
+            </h2>
+            <div className="mt-6 space-y-2.5 font-flsans text-[13.5px] leading-[22px]">
+              <a href="mailto:studio@finelinestudio.com" className="transition-colors hover:text-fl-charcoal">
+                studio@finelinestudio.com
+              </a>
+              <p className="text-[#8b8276]">By appointment</p>
+            </div>
+          </div>
         </div>
 
-        <div>
-          <h3 className="font-sans text-[11px] uppercase tracking-[0.24em] text-fl-ink-faint">Explore</h3>
-          <ul className="mt-4 space-y-2.5">
-            {primaryNav.map((item) => (
-              <li key={item.href}>
-                <Link href={item.href} className="font-sans text-sm text-fl-cream/85 hover:text-fl-champagne">
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div>
-          <h3 className="font-sans text-[11px] uppercase tracking-[0.24em] text-fl-ink-faint">Studio</h3>
-          <ul className="mt-4 space-y-2.5">
-            {utilityNav.map((item) => (
-              <li key={item.href}>
-                <Link href={item.href} className="font-sans text-sm text-fl-cream/85 hover:text-fl-champagne">
-                  {item.label}
-                </Link>
-              </li>
-            ))}
-            <li>
-              <Link href="/about" className="font-sans text-sm text-fl-cream/85 hover:text-fl-champagne">
-                About
-              </Link>
-            </li>
-          </ul>
-        </div>
-
-        <div>
-          <h3 className="font-sans text-[11px] uppercase tracking-[0.24em] text-fl-ink-faint">Correspondence</h3>
-          <ul className="mt-4 space-y-2.5 font-sans text-sm text-fl-cream/85">
-            <li>studio@finelinestudio.com</li>
-            <li>By appointment</li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="border-t border-fl-cream/10">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-5 py-6 text-center sm:flex-row sm:px-8 sm:text-left">
-          <p className="font-sans text-[11px] tracking-[0.08em] text-fl-ink-faint">
+        <div className="mt-20 flex flex-col gap-4 border-t border-fl-charcoal/10 pt-6 sm:flex-row sm:items-center sm:justify-between lg:mt-[86px]">
+          <p className="font-flsans text-[11.5px] text-[#8b8276]">
             © {new Date().getFullYear()} Fine Line Studio. Every idea begins with a line.
           </p>
-          <p className="font-sans text-[11px] tracking-[0.08em] text-fl-ink-faint">
-            Institutional · Corporate · Monogram Atelier
+          <p className="font-flsans text-[10px] font-medium uppercase tracking-[0.16em] text-[#8b8276]">
+            Privacy&nbsp;&nbsp;&nbsp;&nbsp; Terms
           </p>
         </div>
       </div>
     </footer>
+  );
+}
+
+function FooterColumn({ title, links }: { title: string; links: ReadonlyArray<{ label: string; href: string }> }) {
+  return (
+    <div>
+      <h2 className="font-flsans text-[10px] font-medium uppercase tracking-[0.2em] text-[#8b8276]">{title}</h2>
+      <ul className="mt-6 space-y-2.5">
+        {links.map((item) => (
+          <li key={`${title}-${item.href}-${item.label}`}>
+            <Link
+              href={item.href}
+              className="font-flsans text-[13.5px] leading-[22px] transition-colors hover:text-fl-charcoal"
+            >
+              {item.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

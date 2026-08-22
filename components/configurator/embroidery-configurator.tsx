@@ -77,6 +77,7 @@ interface SubmissionResult {
 
 interface EmbroideryConfiguratorProps {
   embedded: boolean;
+  headingLevel?: "h1" | "h2";
   uploadIntent: ConfiguratorUploadIntent;
   blobStorageReady: boolean;
 }
@@ -141,7 +142,12 @@ function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
-export function EmbroideryConfigurator({ embedded, uploadIntent, blobStorageReady }: EmbroideryConfiguratorProps) {
+export function EmbroideryConfigurator({
+  embedded,
+  headingLevel = "h1",
+  uploadIntent,
+  blobStorageReady,
+}: EmbroideryConfiguratorProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const autoPalettePendingRef = useRef(false);
@@ -467,6 +473,8 @@ export function EmbroideryConfigurator({ embedded, uploadIntent, blobStorageRead
     }
   }
 
+  const IntroHeading = headingLevel;
+
   return (
     <section className={`${styles.configurator} ${embedded ? styles.embedded : ""}`}>
       {!embedded && (
@@ -482,7 +490,7 @@ export function EmbroideryConfigurator({ embedded, uploadIntent, blobStorageRead
       <div className={styles.intro}>
         <div>
           <p className={styles.eyebrow}>Embroidery atelier</p>
-          <h1>See your mark<br />in thread.</h1>
+          <IntroHeading>See your mark<br />in thread.</IntroHeading>
         </div>
         <p>Upload an idea, refine its thread and scale, then place it on the object. Every proof remains subject to a studio sew test.</p>
       </div>

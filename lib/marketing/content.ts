@@ -19,7 +19,7 @@ export const primaryNav: NavItem[] = [
 ];
 
 export const utilityNav: NavItem[] = [
-  { label: "Client Portal", href: "/portal" },
+  { label: "Client Portal", href: "/orders/sign-in" },
   { label: "Start an Order", href: "/configure" },
 ];
 
@@ -170,26 +170,26 @@ export const processSteps = [
   {
     number: "01",
     title: "The Idea",
-    body: "A drawing, a monogram, a crest, a logo — sent as-is. We do not need a finished file.",
+    body: "A drawing, a monogram, a crest, a logo — sent as-is.",
   },
   {
     number: "02",
     title: "The Translation",
-    body: "Our digitizers convert the idea into a stitch path — every line assigned a thread, a density, a direction.",
+    body: "We convert the idea into stitch path, density and direction.",
   },
   {
     number: "03",
     title: "The Proof",
-    body: "A sewn sample, on the actual material, before a single production unit is run.",
+    body: "A sewn sample on the actual material before production.",
   },
   {
     number: "04",
     title: "The Production",
-    body: "Precision embroidery on 15-needle heads, inspected by hand, piece by piece.",
+    body: "Precision embroidery on 15-needle heads, inspected by hand.",
   },
   {
     number: "05",
     title: "The Object",
-    body: "Delivered as something you can hold — an idea made permanent in thread.",
+    body: "Delivered as something you can hold — permanent in thread.",
   },
 ];
