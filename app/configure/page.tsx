@@ -17,5 +17,11 @@ export default async function ConfigurePage({
 }) {
   const { embed } = await searchParams;
   const embedded = embed === "1" || embed === "true";
-  return <EmbroideryConfigurator embedded={embedded} uploadIntent={createConfiguratorUploadIntent()} />;
+  return (
+    <EmbroideryConfigurator
+      embedded={embedded}
+      uploadIntent={createConfiguratorUploadIntent()}
+      blobStorageReady={Boolean(process.env.BLOB_READ_WRITE_TOKEN)}
+    />
+  );
 }

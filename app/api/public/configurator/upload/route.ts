@@ -9,6 +9,13 @@ const ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp", "image/s
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as HandleUploadBody | null;
   if (!body) return NextResponse.json({ error: "Invalid upload request." }, { status: 400 });
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    console.error("Public configurator upload unavailable", { reason: "BLOB_READ_WRITE_TOKEN is not configured" });
+    return NextResponse.json(
+      { error: "Artwork storage is temporarily unavailable. Please try again shortly." },
+      { status: 503 },
+    );
+  }
 
   try {
     const response = await handleUpload({
@@ -41,6 +48,7 @@ export async function POST(request: Request) {
     return NextResponse.json(response);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Artwork upload failed.";
+    console.error("Public configurator upload token failed", { message });
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

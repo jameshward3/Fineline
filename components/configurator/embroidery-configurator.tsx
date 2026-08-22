@@ -78,6 +78,7 @@ interface SubmissionResult {
 interface EmbroideryConfiguratorProps {
   embedded: boolean;
   uploadIntent: ConfiguratorUploadIntent;
+  blobStorageReady: boolean;
 }
 
 function catalogKey(item: { id: string | null; name: string }) {
@@ -140,7 +141,7 @@ function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 }
 
-export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryConfiguratorProps) {
+export function EmbroideryConfigurator({ embedded, uploadIntent, blobStorageReady }: EmbroideryConfiguratorProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const autoPalettePendingRef = useRef(false);
@@ -384,6 +385,10 @@ export function EmbroideryConfigurator({ embedded, uploadIntent }: EmbroideryCon
     }
     if (!customer.name.trim() || !customer.email.trim() || !customer.phone.trim() || !customer.consent) {
       setError("Add your name, email, and mobile number, then confirm that the studio may contact you about this request.");
+      return;
+    }
+    if (!blobStorageReady) {
+      setError("Artwork storage is temporarily unavailable. Your configuration is still saved in this browser; please try again shortly.");
       return;
     }
     setError(null);
