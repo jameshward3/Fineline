@@ -10,17 +10,18 @@
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
-    "vercel-build": "prisma generate && DATABASE_URL=\"${DIRECT_URL:-$DATABASE_URL}\" prisma migrate deploy && next build"
+    "vercel-build": "prisma generate && DATABASE_URL=\"${fineline_POSTGRES_URL_NON_POOLING:-${DIRECT_URL:-$DATABASE_URL}}\" prisma migrate deploy && next build"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
-    "@vercel/blob": "^2.8.0",
     "@react-pdf/renderer": "^4.6.1",
+    "@vercel/blob": "^2.8.0",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "dotenv": "^17.4.2",
+    "gsap": "^3.15.0",
     "imagetracerjs": "^1.2.6",
     "jszip": "^3.10.1",
     "lucide-react": "^1.32.0",

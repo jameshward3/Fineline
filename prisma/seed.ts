@@ -3,8 +3,23 @@ import { PrismaClient } from "../app/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import { hexToLab, rgbString, hexToRgb } from "../lib/color";
+import { fileURLToPath } from "node:url";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+// pg-connection-string treats sslmode=require as an alias for verify-full,
+// which rejects Supabase's certificate chain. uselibpqcompat=true restores
+// the classic libpq semantics (encrypt without strict CA verification).
+function withLibpqCompat(connectionString: string) {
+  const url = new URL(connectionString);
+  url.searchParams.set("uselibpqcompat", "true");
+  return url.toString();
+}
+
+const adapter = new PrismaPg({
+  connectionString: withLibpqCompat(
+    process.env.fineline_POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL!
+  ),
+  ssl: { rejectUnauthorized: false },
+});
 const prisma = new PrismaClient({ adapter });
 
 const PALETTE_ORDER = [
@@ -45,7 +60,7 @@ const MACHINE_NEEDLE_ORDER = [
   "Purple",
 ];
 
-async function main() {
+export async function main() {
   const org = await prisma.organization.upsert({
     where: { id: "org_demo" },
     update: { name: "Fine Line Studio" },
@@ -897,12 +912,16 @@ async function main() {
   });
 }
 
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+const isDirectRun = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
+
+if (isDirectRun) {
+  main()
+    .then(async () => {
+      await prisma.$disconnect();
+    })
+    .catch(async (e) => {
+      console.error(e);
+      await prisma.$disconnect();
+      process.exit(1);
+    });
+}
