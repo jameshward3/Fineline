@@ -32,7 +32,7 @@ export function SiteFooter() {
 
         <div className="mt-20 flex flex-col gap-4 border-t border-fl-charcoal/10 pt-6 sm:flex-row sm:items-center sm:justify-between lg:mt-[86px]">
           <p className="font-flsans text-[11.5px] text-[#8b8276]">
-            © {new Date().getFullYear()} Fine Line Studio. Every idea begins with a line.
+            © {new Date().getFullYear()} Fine Ligne Studio. Every idea begins with a line.
           </p>
           <p className="font-flsans text-[10px] font-medium uppercase tracking-[0.16em] text-[#8b8276]">
             Privacy&nbsp;&nbsp;&nbsp;&nbsp; Terms
