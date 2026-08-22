@@ -453,13 +453,14 @@ export async function main() {
 
   const client = await prisma.client.upsert({
     where: { id: "client_orange_tigers" },
-    update: {},
+    update: { phone: "(555) 867-5309" },
     create: {
       id: "client_orange_tigers",
       organizationId: org.id,
       name: "Orange Tigers",
       contactName: "Coach Danielle Price",
       email: "dprice@orangetigers.example",
+      phone: "(555) 867-5309",
     },
   });
 

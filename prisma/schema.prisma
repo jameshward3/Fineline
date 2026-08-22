@@ -98,6 +98,7 @@ model Client {
   opportunities    Opportunity[]
   samples          Sample[]
   monogramProfiles MonogramProfile[]
+  portalNotes      Note[]            @relation("NoteAuthorClient")
 }
 
 // ---------------------------------------------------------------------------
@@ -628,10 +629,16 @@ model Note {
   id         String         @id @default(cuid())
   entityType NoteEntityType
   entityId   String
-  authorId   String
-  author     User           @relation("NoteAuthor", fields: [authorId], references: [id])
-  body       String
-  createdAt  DateTime       @default(now())
+  // Exactly one of authorId (staff) / authorClientId (portal) is set.
+  authorId       String?
+  author         User?          @relation("NoteAuthor", fields: [authorId], references: [id])
+  authorClientId String?
+  authorClient   Client?        @relation("NoteAuthorClient", fields: [authorClientId], references: [id])
+  // Staff notes are internal by default; client-authored notes are always
+  // visible to the client that wrote them (checked at the action layer).
+  visibleToClient Boolean       @default(false)
+  body            String
+  createdAt       DateTime      @default(now())
 
   @@index([entityType, entityId])
 }

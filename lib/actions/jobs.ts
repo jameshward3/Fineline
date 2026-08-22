@@ -70,3 +70,31 @@ export async function updateJobStatus(jobId: string, status: JobStatus) {
   revalidatePath("/jobs");
   revalidatePath("/dashboard");
 }
+
+const jobNoteSchema = z.object({
+  jobId: z.string().min(1),
+  body: z.string().min(1).max(2000),
+  visibleToClient: z.literal("on").optional(),
+});
+
+export async function addJobNote(
+  _prevState: { error: string | null },
+  formData: FormData
+): Promise<{ error: string | null }> {
+  const session = await requireSession();
+  const parsed = jobNoteSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: "Note can't be empty." };
+
+  await prisma.note.create({
+    data: {
+      entityType: "JOB",
+      entityId: parsed.data.jobId,
+      authorId: session.user.id,
+      visibleToClient: parsed.data.visibleToClient === "on",
+      body: parsed.data.body,
+    },
+  });
+
+  revalidatePath(`/jobs/${parsed.data.jobId}`);
+  return { error: null };
+}

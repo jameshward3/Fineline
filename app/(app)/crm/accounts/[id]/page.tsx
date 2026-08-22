@@ -33,7 +33,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
   const insights = buildStudioInsights(account);
 
   const timeline = [
-    ...notes.map((n) => ({ date: n.createdAt, label: `${n.author.name}: ${n.body}` })),
+    ...notes.map((n) => ({ date: n.createdAt, label: `${n.author?.name ?? "Fine Line Studio"}: ${n.body}` })),
     ...account.jobs.map((j) => ({ date: j.createdAt, label: `Job ${j.jobNumber} created` })),
     ...account.samples.map((s) => ({ date: s.createdAt, label: `Sample "${s.name}" ${SAMPLE_STATUS_LABELS[s.status].toLowerCase()}` })),
     ...account.opportunities.map((o) => ({ date: o.createdAt, label: `Opportunity "${o.name}" opened` })),

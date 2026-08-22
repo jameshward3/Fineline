@@ -38,3 +38,11 @@ export async function getJob(id: string) {
     },
   });
 }
+
+export async function getJobNotes(jobId: string) {
+  return prisma.note.findMany({
+    where: { entityType: "JOB", entityId: jobId },
+    orderBy: { createdAt: "asc" },
+    include: { author: { select: { name: true } }, authorClient: { select: { name: true } } },
+  });
+}

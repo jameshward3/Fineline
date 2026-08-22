@@ -1,18 +1,19 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Download } from "lucide-react";
-import { getJob } from "@/lib/queries/jobs";
+import { getJob, getJobNotes } from "@/lib/queries/jobs";
 import { Panel, PanelHeader } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { StatusStepper } from "@/components/jobs/status-stepper";
 import { NeedleStrip } from "@/components/machines/needle-strip";
+import { JobNoteForm } from "@/components/jobs/job-note-form";
 import { optimizeNeedleAssignment } from "@/lib/services/needle-optimizer";
 import { JOB_STATUS_META, PRODUCTION_RESULT_META } from "@/lib/status";
 import { formatRelativeTime } from "@/lib/utils";
 
 export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const job = await getJob(id);
+  const [job, notes] = await Promise.all([getJob(id), getJobNotes(id)]);
   if (!job) notFound();
 
   const requiredColors = job.items.flatMap((item) =>
@@ -138,6 +139,30 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </div>
         </Panel>
       )}
+
+      <Panel>
+        <PanelHeader
+          title="Client Communication"
+          subtitle={job.client ? `Shared notes appear in ${job.client.name}'s portal` : "No client on this order"}
+        />
+        <div className="space-y-3 mb-4">
+          {notes.map((n) => (
+            <div key={n.id} className="rounded-md border border-border bg-surface-inset p-2.5">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-medium text-ink">
+                  {n.authorClient ? n.authorClient.name : (n.author?.name ?? "Staff")}
+                </span>
+                {n.authorClient && <Badge tone="accent">Client</Badge>}
+                {!n.authorClient && n.visibleToClient && <Badge tone="info">Shared</Badge>}
+                <span className="text-ink-faint">{formatRelativeTime(n.createdAt)}</span>
+              </div>
+              <p className="text-sm text-ink mt-1">{n.body}</p>
+            </div>
+          ))}
+          {notes.length === 0 && <p className="text-sm text-ink-faint text-center py-4">No notes yet.</p>}
+        </div>
+        <JobNoteForm jobId={job.id} />
+      </Panel>
     </div>
   );
 }
