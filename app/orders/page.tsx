@@ -23,7 +23,7 @@ export default async function CustomerOrdersPage() {
     >
       <section className={styles.ordersIndex}>
         <div className={styles.indexHeading}>
-          <div><p>Customer studio</p><h1>My orders</h1><span>Every active and completed Fine Ligne project in one place.</span></div>
+          <div><p>Customer studio</p><h1>My orders</h1><span>Every active and completed Fine Line project in one place.</span></div>
           <Link href="/configure"><Plus size={15} /> Start a new order</Link>
         </div>
         {orders.length ? (

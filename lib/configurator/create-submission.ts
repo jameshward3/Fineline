@@ -202,7 +202,7 @@ export async function createConfiguratorSubmission(data: ConfiguratorSubmissionI
         designId: design.id,
         versionNumber: 1,
         status: "DRAFT",
-        changeNotes: data.configuration.notes || "Created from the Fine Ligne public embroidery configurator.",
+        changeNotes: data.configuration.notes || "Created from the Fine Line public embroidery configurator.",
         createdById: ownerId,
         widthInches: data.configuration.widthInches,
         heightInches: data.configuration.heightInches,

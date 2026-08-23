@@ -39,10 +39,7 @@ export const metadata: Metadata = {
   title: `${brand.companyName} — Imagined Luxury. Actualized.`,
   description:
     "Fine Ligne Studio transforms an idea, a monogram, a crest, an identity into thread and fabric. Institutional uniforms, corporate gifting, and luxury monogramming, embroidered with precision.",
-  icons: {
-    icon: [{ url: brand.favicon, type: "image/png" }],
-    apple: [{ url: brand.favicon, type: "image/png" }],
-  },
+  icons: { icon: brand.favicon },
 };
 
 export default function RootLayout({

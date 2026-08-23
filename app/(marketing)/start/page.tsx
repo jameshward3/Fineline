@@ -4,8 +4,8 @@ import { configuratorPaths } from "@/lib/marketing/content";
 import { PageShell } from "@/components/marketing/PageShell";
 
 export const metadata: Metadata = {
-  title: "Start an Order — Fine Ligne Studio",
-  description: "What would you like to create? Begin your Fine Ligne Studio order.",
+  title: "Start an Order — Fine Line Studio",
+  description: "What would you like to create? Begin your Fine Line Studio order.",
 };
 
 export default function StartPage() {

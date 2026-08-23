@@ -2,7 +2,6 @@
 
 import { upload } from "@vercel/blob/client";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -24,7 +23,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { brand } from "@/lib/branding";
+import { LogoLockup } from "@/components/story/marks";
 import { analyzeColors } from "@/lib/services/image-processing/color-analysis";
 import { quantizeColors, type QuantizeResult } from "@/lib/services/image-processing/quantize";
 import type { PaletteEntry, PixelBuffer } from "@/lib/services/image-processing/types";
@@ -480,8 +479,9 @@ export function EmbroideryConfigurator({
     <section className={`${styles.configurator} ${embedded ? styles.embedded : ""}`}>
       {!embedded && (
         <header className={styles.header}>
-          <Link href="/" className={styles.brand} aria-label="Fine Ligne Studio home">
-            <Image src={brand.logoMark} alt="" width={300} height={185} priority />
+          <Link href="/" className={styles.brand} aria-label="Fine Line Studio home">
+            <svg viewBox="-115 -120 230 260" aria-hidden><LogoLockup id="configurator-brand" showThread /></svg>
+            <span><strong>FINE LINE</strong><small>STUDIO</small></span>
           </Link>
           <div className={styles.secureLabel}><Lock size={12} aria-hidden /> Secure artwork intake</div>
         </header>
@@ -726,7 +726,7 @@ export function EmbroideryConfigurator({
               </div>
               <label className={styles.field}><span>Notes for the atelier</span><textarea rows={4} value={customer.notes} onChange={(event) => setCustomer((current) => ({ ...current, notes: event.target.value }))} placeholder="Material, deadline, sizing mix, or anything the studio should know." /></label>
               <label className={styles.honeypot} aria-hidden><span>Website</span><input tabIndex={-1} autoComplete="off" value={website} onChange={(event) => setWebsite(event.target.value)} /></label>
-              <label className={styles.consent}><input type="checkbox" checked={customer.consent} onChange={(event) => setCustomer((current) => ({ ...current, consent: event.target.checked }))} /><span>I agree that Fine Ligne Studio may contact me about this configuration and retain the uploaded artwork for production review.</span></label>
+              <label className={styles.consent}><input type="checkbox" checked={customer.consent} onChange={(event) => setCustomer((current) => ({ ...current, consent: event.target.checked }))} /><span>I agree that Fine Line Studio may contact me about this configuration and retain the uploaded artwork for production review.</span></label>
             </div>
           )}
 

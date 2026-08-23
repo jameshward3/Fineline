@@ -1,7 +1,6 @@
 import Image from "next/image";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { brand } from "@/lib/branding";
 import type { ConfiguratorUploadIntent } from "@/lib/configurator/upload-intent";
 import { processSteps } from "@/lib/marketing/content";
 
@@ -89,7 +88,7 @@ function HeroSection() {
       <div className="absolute inset-x-0 top-0 h-[651px] overflow-hidden bg-[#d8cdbe]">
         <Image
           src="/marketing/hero-embroidery.png"
-          alt="Fine Ligne embroidery taking shape beneath a multi-needle embroidery machine"
+          alt="Fine Line embroidery taking shape beneath a multi-needle embroidery machine"
           fill
           priority
           sizes="100vw"
@@ -187,7 +186,7 @@ function AtelierBand() {
     <section className="relative h-[400px] overflow-hidden bg-fl-charcoal text-fl-paper">
       <Image
         src="/marketing/atelier-machines.png"
-        alt="Fine Ligne Studio embroidery heads aligned for production"
+        alt="Fine Line Studio embroidery heads aligned for production"
         fill
         sizes="100vw"
         className="object-cover"
@@ -217,24 +216,12 @@ function BrandPromise() {
     <section className="relative h-[600px] overflow-hidden bg-[#8a7a62] text-fl-paper">
       <Image
         src="/marketing/brand-thread-source-1.png"
-        alt="Fine Ligne Studio thread-and-needle mark"
+        alt="Fine Line Studio thread-and-needle mark"
         fill
         sizes="100vw"
         className="object-cover object-[center_34%]"
       />
       <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(26,26,26,0.02)_25%,rgba(26,26,26,0.12)_58%,rgba(26,26,26,0.5)_100%)]" />
-      <div className="absolute left-6 right-6 top-12 aspect-[525/205] overflow-hidden border border-fl-paper/20 shadow-[0_24px_70px_rgba(26,26,26,0.28)] sm:left-10 sm:right-auto sm:w-[min(52vw,525px)] lg:left-16 lg:top-1/2 lg:-translate-y-1/2">
-        <Image
-          src={brand.embroideredLogo}
-          alt="Fine Ligne Studio logo embroidered into natural fabric"
-          fill
-          sizes="(min-width: 1024px) 525px, 52vw"
-          className="object-cover"
-        />
-        <span className="absolute left-0 top-0 bg-[#dfcdb5]/95 px-3 py-2 font-flsans text-[8px] font-medium uppercase tracking-[0.18em] text-fl-charcoal">
-          Fine Ligne · Thread proof
-        </span>
-      </div>
       <div className="relative mx-auto flex h-full max-w-[1440px] items-end justify-end px-6 pb-28 text-right sm:px-10 lg:px-16">
         <div className="max-w-[400px]">
           <h2 className="font-display text-[32px] font-normal leading-[42px] tracking-[0.04em]">

@@ -1,22 +1,13 @@
 import Link from "next/link";
-import Image from "next/image";
-import { brand } from "@/lib/branding";
+import { LogoLockup } from "@/components/story/marks";
 import styles from "./order-portal.module.css";
 
-export function PortalBrand({ variant = "stacked" }: { variant?: "stacked" | "dark" }) {
+export function PortalBrand() {
   return (
-    <Link
-      href="/"
-      className={`${styles.portalBrand} ${variant === "dark" ? styles.portalBrandDark : ""}`}
-      aria-label="Fine Ligne Studio home"
-    >
-      <Image
-        src={variant === "dark" ? brand.logoDark : brand.logoBadge}
-        alt=""
-        fill
-        sizes={variant === "dark" ? "245px" : "118px"}
-        priority
-      />
+    <Link href="/" className={styles.portalBrand} aria-label="Fine Line Studio home">
+      <svg viewBox="-115 -120 230 260" aria-hidden>
+        <LogoLockup id="customer-portal-brand" showThread />
+      </svg>
     </Link>
   );
 }

@@ -1,32 +1,25 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { PageShell } from "@/components/marketing/PageShell";
-import { brand } from "@/lib/branding";
+import { LogoLockup } from "@/components/story/marks";
 
 export const metadata: Metadata = {
-  title: "About — Fine Ligne Studio",
-  description: "Fine Ligne Studio is a premium embroidery and personalization atelier.",
+  title: "About — Fine Line Studio",
+  description: "Fine Line Studio is a premium embroidery and personalization atelier.",
 };
 
 export default function AboutPage() {
   return (
     <PageShell>
       <section className="mx-auto flex max-w-3xl flex-col items-center px-5 py-20 text-center sm:px-8 sm:py-28">
-        <Image
-          src={brand.logoMark}
-          alt={brand.companyName}
-          width={300}
-          height={185}
-          sizes="180px"
-          className="h-auto w-[180px] mix-blend-multiply"
-          priority
-        />
+        <svg viewBox="-100 -110 200 230" className="h-24 w-24 text-fl-charcoal">
+          <LogoLockup id="about-mark" />
+        </svg>
         <p className="mt-8 font-sans text-[11px] uppercase tracking-[0.28em] text-fl-brass">About</p>
         <h1 className="mt-4 font-serif text-4xl leading-[1.1] text-fl-charcoal sm:text-5xl">
           Imagined Luxury. Actualized.
         </h1>
         <p className="mt-8 font-sans text-base leading-relaxed text-fl-ink-muted">
-          Fine Ligne Studio exists to close the distance between an idea and an object. A crest
+          Fine Line Studio exists to close the distance between an idea and an object. A crest
           sketched on a napkin. A family monogram passed down and never quite formalized. A
           company mark that deserves better than a heat-transfer vinyl. We take the idea as it
           arrives — rough, half-finished, entirely unspecified — and translate it into a stitch

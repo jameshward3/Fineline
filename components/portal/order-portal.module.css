@@ -43,34 +43,17 @@
 }
 
 .portalBrand {
-  position: relative;
   display: block;
   width: 118px;
-  height: 108px;
+  height: 134px;
   margin: 0 auto 22px;
   color: var(--portal-ink);
-  overflow: hidden;
 }
 
-.portalBrand img {
+.portalBrand svg {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  mix-blend-mode: multiply;
-}
-
-.portalBrandDark img {
-  mix-blend-mode: normal;
-}
-
-.portalBrandDark::after {
-  position: absolute;
-  inset: 0 auto auto 0;
-  width: 34%;
-  height: 17%;
-  background: linear-gradient(90deg, #202728 68%, rgba(32, 39, 40, 0));
-  content: "";
-  pointer-events: none;
+  overflow: visible;
 }
 
 .primaryNav,
@@ -968,8 +951,8 @@
 }
 
 .signInBrandRail .portalBrand {
-  width: min(245px, 72%);
-  height: 106px;
+  width: 130px;
+  height: 150px;
   margin: 0;
   color: #f7f3e8;
 }
@@ -1290,8 +1273,8 @@
   }
 
   .portalSidebar .portalBrand {
-    width: 58px;
-    height: 52px;
+    width: 50px;
+    height: 57px;
     margin: 0;
   }
 
@@ -1373,7 +1356,7 @@
   }
 
   .signInBrandRail .portalBrand {
-    width: 190px;
+    width: 73px;
     height: 82px;
   }
 

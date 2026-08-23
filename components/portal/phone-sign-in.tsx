@@ -42,7 +42,7 @@ export function PhoneSignIn({ orderReference }: { orderReference?: string }) {
       <div className={styles.signInKicker}><Phone size={14} /> Customer order access</div>
       <h1>Your order, kept in one place.</h1>
       <p className={styles.signInCopy}>
-        Use the mobile number attached to your Fine Ligne request to review its progress and return to every past order.
+        Use the mobile number attached to your Fine Line request to review its progress and return to every past order.
       </p>
 
       {orderReference && (

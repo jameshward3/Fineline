@@ -122,7 +122,7 @@ export function OrderDashboard({ order }: { order: PortalOrder }) {
           <section className={`${styles.portalCard} ${styles.behindScenes}`}>
             <div className={styles.cardHeader}><h2>Behind the scenes</h2></div>
             <ol>
-              <li className={order.progress >= 1 ? styles.sceneComplete : ""}><span>{order.progress > 1 ? <Check size={12} /> : <Clock3 size={12} />}</span><p>Sends to Fine Ligne OS<small>{order.progress > 1 ? "Complete" : "In progress"}</small></p></li>
+              <li className={order.progress >= 1 ? styles.sceneComplete : ""}><span>{order.progress > 1 ? <Check size={12} /> : <Clock3 size={12} />}</span><p>Sends to Fine Line OS<small>{order.progress > 1 ? "Complete" : "In progress"}</small></p></li>
               <li className={order.progress >= 2 ? styles.sceneComplete : ""}><span>{order.progress > 2 ? <Check size={12} /> : <Clock3 size={12} />}</span><p>Studio stitch review<small>{order.progress > 2 ? "Complete" : order.progress === 2 ? "In progress" : "Pending"}</small></p></li>
               <li className={order.progress >= 3 ? styles.sceneComplete : ""}><span>{order.progress > 3 ? <Check size={12} /> : <Clock3 size={12} />}</span><p>Production team notified<small>{order.progress > 3 ? "Complete" : order.progress === 3 ? "In progress" : "Pending"}</small></p></li>
             </ol>

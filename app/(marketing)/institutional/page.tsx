@@ -4,7 +4,7 @@ import { CategoryDetail } from "@/components/marketing/CategoryDetail";
 import { ShirtShape } from "@/components/story/marks";
 
 export const metadata: Metadata = {
-  title: "Institutional & School — Fine Ligne Studio",
+  title: "Institutional & School — Fine Line Studio",
   description: "Crest-approved uniform programs for schools and institutions, embroidered to last.",
 };
 

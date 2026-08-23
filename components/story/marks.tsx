@@ -10,7 +10,7 @@ import { forwardRef } from "react";
  * of these static shapes; nothing here is ever swapped or cross-faded at
  * the DOM level for the needle/thread themselves).
  *
- * The needle + thread gesture reproduces the actual Fine Ligne Studio mark
+ * The needle + thread gesture reproduces the actual Fine Line Studio mark
  * (see public/branding/mark.svg) rather than inventing a new symbol.
  */
 
@@ -51,7 +51,7 @@ export function NeedleBarShape({ className }: { className?: string }) {
 
 /** The thread: a signature-like flourish that emerges from the needle's
  *  eye, sweeps left across the top and curls into a small loop underneath
- *  — the actual Fine Ligne Studio mark's gesture. Draws with pathLength=1
+ *  — the actual Fine Line Studio mark's gesture. Draws with pathLength=1
  *  so callers can scrub strokeDashoffset 1 -> 0 without measuring geometry. */
 export const ThreadSwirl = forwardRef<
   SVGPathElement,
@@ -122,7 +122,7 @@ export function WordmarkGroup({
 }
 
 /** Full lockup: icon (needle + thread) composed above the wordmark, at
- *  the proportions of the reference Fine Ligne Studio mark. Used for the
+ *  the proportions of the reference Fine Line Studio mark. Used for the
  *  static logo (nav, footer, favicon-scale contexts) and as the opening
  *  frame of the cinematic intro. */
 export function LogoLockup({

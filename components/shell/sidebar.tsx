@@ -14,17 +14,7 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex md:w-60 md:flex-col md:fixed md:inset-y-0 border-r border-border bg-surface">
       <div className="h-14 flex items-center px-4 border-b border-border">
-        <div className="relative h-[52px] w-[146px] overflow-hidden">
-          <Image
-            src={brand.logoDark}
-            alt={brand.companyName}
-            fill
-            sizes="146px"
-            className="object-contain"
-            priority
-          />
-          <span className="pointer-events-none absolute left-0 top-0 h-3 w-[52px] bg-gradient-to-r from-surface via-surface to-transparent" />
-        </div>
+        <Image src={brand.logo} alt={brand.companyName} width={156} height={26} priority />
       </div>
 
       <div className="p-3">

@@ -17,7 +17,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-fl-charcoal/10 bg-fl-paper/95 backdrop-blur-md">
       <div className="mx-auto flex h-[88px] max-w-[1440px] items-center justify-between px-6 sm:px-10 lg:px-16">
         <Link href="/" aria-label="Fine Ligne Studio home" onClick={() => setOpen(false)}>
-          <BrandWordmark priority />
+          <BrandWordmark />
         </Link>
 
         <nav className="hidden items-center gap-[38px] lg:flex" aria-label="Primary navigation">

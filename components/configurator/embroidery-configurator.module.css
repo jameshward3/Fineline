@@ -33,14 +33,31 @@
 .brand {
   display: inline-flex;
   align-items: center;
+  gap: 10px;
   color: var(--ink);
   text-decoration: none;
 }
 
-.brand img {
-  width: 98px;
-  height: auto;
-  mix-blend-mode: multiply;
+.brand svg {
+  width: 43px;
+  height: 48px;
+}
+
+.brand span {
+  display: grid;
+  gap: 2px;
+}
+
+.brand strong {
+  font-family: var(--font-fl-serif), Georgia, serif;
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.24em;
+}
+
+.brand small {
+  font-size: 7px;
+  letter-spacing: 0.4em;
 }
 
 .secureLabel {

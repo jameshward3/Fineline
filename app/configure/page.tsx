@@ -5,8 +5,8 @@ import { createConfiguratorUploadIntent } from "@/lib/configurator/upload-intent
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Configure Your Embroidery — Fine Ligne Studio",
-  description: "Upload artwork, map thread colors, set placement and size, and preview a Fine Ligne Studio embroidery commission in 3D.",
+  title: "Configure Your Embroidery — Fine Line Studio",
+  description: "Upload artwork, map thread colors, set placement and size, and preview a Fine Line Studio embroidery commission in 3D.",
   robots: { index: false, follow: false },
 };
 

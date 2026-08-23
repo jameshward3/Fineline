@@ -10,8 +10,8 @@ export function SiteFooter() {
       <div className="mx-auto max-w-[1440px] px-6 pb-16 pt-20 sm:px-10 lg:px-16 lg:pb-[90px] lg:pt-24">
         <div className="grid gap-12 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr] lg:gap-16">
           <div>
-            <BrandWordmark variant="stacked" />
-            <p className="mt-5 font-display text-[15px] leading-6">Imagined Luxury. Actualized.</p>
+            <BrandWordmark />
+            <p className="mt-6 font-display text-[15px] leading-6">Imagined Luxury. Actualized.</p>
           </div>
 
           <FooterColumn title="Explore" links={primaryNav} />

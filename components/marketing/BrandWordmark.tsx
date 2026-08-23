@@ -1,43 +1,22 @@
 import Image from "next/image";
-import { brand } from "@/lib/branding";
 import { cn } from "@/lib/utils";
 
-export function BrandWordmark({
-  className,
-  variant = "wordmark",
-  priority = false,
-}: {
-  className?: string;
-  variant?: "wordmark" | "stacked";
-  priority?: boolean;
-}) {
-  if (variant === "stacked") {
-    return (
-      <span className={cn("relative block h-[108px] w-[120px] overflow-hidden", className)}>
-        <Image
-          src={brand.logoBadge}
-          alt={brand.companyName}
-          width={395}
-          height={357}
-          sizes="120px"
-          className="h-auto w-full mix-blend-multiply"
-          priority={priority}
-        />
-      </span>
-    );
-  }
-
+export function BrandWordmark({ className }: { className?: string }) {
   return (
-    <span className={cn("relative block h-[50px] w-[158px] overflow-hidden", className)}>
+    <span className={cn("relative block h-[60px] w-[138px] text-fl-charcoal", className)}>
       <Image
-        src={brand.wordmark}
-        alt={brand.companyName}
-        width={335}
-        height={135}
-        sizes="158px"
-        className="absolute -top-[11px] left-0 h-auto w-full max-w-none mix-blend-multiply"
-        priority={priority}
+        src="/marketing/brand-thread-mark.svg"
+        alt=""
+        width={118}
+        height={26}
+        className="absolute left-0.5 top-1.5 h-[26px] w-[118px]"
       />
+      <span className="absolute left-0 top-[29px] whitespace-nowrap font-display text-[15px] leading-none tracking-[2.35px]">
+        FINE LIGNE
+      </span>
+      <span className="absolute left-[28px] top-[49px] font-flsans text-[7px] font-light leading-none tracking-[3.4px]">
+        STUDIO
+      </span>
     </span>
   );
 }

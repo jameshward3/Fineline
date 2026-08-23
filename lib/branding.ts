@@ -12,15 +12,10 @@ export const brand = {
   productSubtitle: "Artwork-to-Embroidery Production System",
   tagline: "Imagined luxury, actualized.",
 
-  // Supplied Fine Ligne identity system. Keep these paths centralized so
-  // public, portal, and internal surfaces always use the same approved art.
-  logo: "/branding/fine-ligne-logo-dark.png",
-  logoDark: "/branding/fine-ligne-logo-dark.png",
-  logoMark: "/branding/fine-ligne-brand-mark.png",
-  logoBadge: "/branding/fine-ligne-secondary-stacked.png",
-  wordmark: "/branding/fine-ligne-wordmark.png",
-  embroideredLogo: "/branding/fine-ligne-embroidered-logo.png",
-  favicon: "/branding/fine-ligne-favicon.png",
+  logo: "/branding/logo.svg",
+  logoMark: "/branding/mark.svg",
+  logoBadge: "/branding/logo-badge.svg",
+  favicon: "/branding/favicon.svg",
 
   colors: {
     primary: "#C9A227",
