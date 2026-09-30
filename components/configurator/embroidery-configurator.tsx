@@ -26,7 +26,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { LogoLockup } from "@/components/story/marks";
 import { analyzeColors } from "@/lib/services/image-processing/color-analysis";
 import { quantizeColors, type QuantizeResult } from "@/lib/services/image-processing/quantize";
-import type { PaletteEntry, PixelBuffer } from "@/lib/services/image-processing/types";
+import { fromImageData, type PaletteEntry, type PixelBuffer } from "@/lib/services/image-processing/types";
 import { loadImageFile, formatBytes } from "@/lib/wizard/canvas-utils";
 import { deltaE76, hexToLab } from "@/lib/color";
 import {
@@ -37,7 +37,14 @@ import {
   type PublicThreadColor,
 } from "@/lib/configurator/catalog";
 import { createThreadTextureMaps, prepareArtworkBuffer, type ThreadTextureMaps } from "@/lib/configurator/artwork-texture";
-import { calculateConfiguratorQuote, type BorderStyle, type ThreadWeightChoice } from "@/lib/configurator/pricing";
+import {
+  calculateConfiguratorQuote,
+  calculateLetteringQuote,
+  countLetteringCharacters,
+  LETTERING_RATE_PER_LETTER,
+  type BorderStyle,
+  type ThreadWeightChoice,
+} from "@/lib/configurator/pricing";
 import { STITCH_STYLES, stitchStyleLabel, type StitchStyle } from "@/lib/configurator/stitch-simulation";
 import type { ConfiguratorThreadMapping } from "@/lib/configurator/schema";
 import type { ConfiguratorUploadIntent } from "@/lib/configurator/upload-intent";
@@ -122,9 +129,62 @@ function mappingsFor(palette: PaletteEntry[], threads: PublicThreadColor[]): Con
   });
 }
 
+/** Custom lettering has no analyzed artwork colors to map from — the customer
+ * picks the thread count and spools directly. sourceHex mirrors targetHex
+ * since there is no "detected" color to translate from. */
+function letteringMappingsFor(count: number, threads: PublicThreadColor[]): ConfiguratorThreadMapping[] {
+  return Array.from({ length: count }, (_, index) => {
+    const thread = threads[index % Math.max(1, threads.length)];
+    const hex = thread?.hex ?? "#1A1A1A";
+    return {
+      sequence: index + 1,
+      sourceHex: hex,
+      targetHex: hex,
+      threadColorId: thread?.id ?? null,
+      threadName: thread?.name ?? "Custom color",
+      manufacturerCode: thread?.manufacturerCode ?? "",
+      coverage: 1 / count,
+    };
+  });
+}
+
 function safeArtworkName(fileName: string) {
   const normalized = fileName.normalize("NFKD").replace(/[^A-Za-z0-9._-]+/g, "-");
   return normalized.replace(/^-+|-+$/g, "").slice(-180) || "artwork.png";
+}
+
+/**
+ * Custom lettering doesn't come from an uploaded file, but submission still
+ * requires a real artwork image (the studio reviews a proof either way and
+ * downstream storage/DB plumbing all expects one). Render the text onto a
+ * canvas and package it exactly like a user upload so the rest of the
+ * pipeline — upload, verification, ArtworkAsset — needs no special-casing.
+ */
+async function renderLetteringArtwork(text: string, colorHex: string): Promise<ArtworkState> {
+  const fontSize = 220;
+  const paddingX = 60;
+  const paddingY = 90;
+  const measure = document.createElement("canvas").getContext("2d");
+  if (!measure) throw new Error("Could not render the lettering preview.");
+  measure.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
+  const textWidth = Math.max(1, Math.ceil(measure.measureText(text).width));
+
+  const canvas = document.createElement("canvas");
+  canvas.width = textWidth + paddingX * 2;
+  canvas.height = fontSize + paddingY * 2;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not render the lettering preview.");
+  ctx.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
+  ctx.fillStyle = colorHex;
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, paddingX, canvas.height / 2);
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((result) => (result ? resolve(result) : reject(new Error("Could not render the lettering preview."))), "image/png");
+  });
+  const file = new File([blob], `lettering-${Date.now()}.png`, { type: "image/png" });
+  const buffer = fromImageData(ctx.getImageData(0, 0, canvas.width, canvas.height));
+  return { file, buffer, naturalWidth: canvas.width, naturalHeight: canvas.height };
 }
 
 function hasTransparentPixels(buffer: PixelBuffer) {
@@ -159,6 +219,9 @@ export function EmbroideryConfigurator({
   );
   const [catalog, setCatalog] = useState<ConfiguratorCatalog>(FALLBACK_CATALOG);
   const [activeStep, setActiveStep] = useState(0);
+  const [designMode, setDesignMode] = useState<"ARTWORK" | "LETTERING">("ARTWORK");
+  const [letteringText, setLetteringText] = useState("");
+  const [letteringColorCount, setLetteringColorCount] = useState(1);
   const [artwork, setArtwork] = useState<ArtworkState | null>(null);
   const [quantized, setQuantized] = useState<QuantizedState | null>(null);
   const [mappings, setMappings] = useState<ConfiguratorThreadMapping[]>([]);
@@ -226,7 +289,7 @@ export function EmbroideryConfigurator({
   }, [placement]);
 
   useEffect(() => {
-    if (!artwork) return;
+    if (!artwork || designMode !== "ARTWORK") return;
     let cancelled = false;
     setProcessing(true);
     const timer = window.setTimeout(() => {
@@ -249,7 +312,21 @@ export function EmbroideryConfigurator({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [artwork, catalog.threads, removeLightBackground, targetColorCount]);
+  }, [artwork, catalog.threads, designMode, removeLightBackground, targetColorCount]);
+
+  useEffect(() => {
+    if (designMode !== "LETTERING") return;
+    setMappings(letteringMappingsFor(letteringColorCount, catalog.threads));
+  }, [designMode, letteringColorCount, catalog.threads]);
+
+  useEffect(() => {
+    if (designMode !== "LETTERING" || !letteringText.trim()) return;
+    setDesignName((current) =>
+      current.trim() === "" || current.startsWith("Custom lettering — ")
+        ? `Custom lettering — ${letteringText.trim()}`
+        : current
+    );
+  }, [designMode, letteringText]);
 
   useEffect(() => {
     if (!quantized || mappings.length !== quantized.palette.length) {
@@ -272,17 +349,39 @@ export function EmbroideryConfigurator({
     return () => window.clearTimeout(timer);
   }, [borderColor, borderStyle, borderWidthMm, densityMm, mappings, quantized, stitchStyle, threadWeight]);
 
-  const quote = useMemo(() => calculateConfiguratorQuote({
-    widthInches,
-    heightInches,
-    quantity,
-    colorCount: Math.max(1, mappings.length),
-    densityMm,
-    threadWeight,
+  const quote = useMemo(() => {
+    if (designMode === "LETTERING") {
+      return calculateLetteringQuote({
+        text: letteringText,
+        quantity,
+        colorCount: Math.max(1, mappings.length),
+        productCategory: product.category,
+      });
+    }
+    return calculateConfiguratorQuote({
+      widthInches,
+      heightInches,
+      quantity,
+      colorCount: Math.max(1, mappings.length),
+      densityMm,
+      threadWeight,
+      borderStyle,
+      borderWidthMm,
+      productCategory: product.category,
+    });
+  }, [
     borderStyle,
     borderWidthMm,
-    productCategory: product.category,
-  }), [borderStyle, borderWidthMm, densityMm, heightInches, mappings.length, product.category, quantity, threadWeight, widthInches]);
+    densityMm,
+    designMode,
+    heightInches,
+    letteringText,
+    mappings.length,
+    product.category,
+    quantity,
+    threadWeight,
+    widthInches,
+  ]);
 
   const parentOrigin = useMemo(() => {
     if (!embedded || typeof document === "undefined" || !document.referrer) return null;
@@ -366,7 +465,8 @@ export function EmbroideryConfigurator({
 
   function canContinue() {
     if (activeStep === 0 && (!product || quantity < 1)) return "Choose a product and quantity to continue.";
-    if (activeStep === 0 && !artwork) return "Upload artwork to continue.";
+    if (activeStep === 0 && designMode === "ARTWORK" && !artwork) return "Upload artwork to continue.";
+    if (activeStep === 0 && designMode === "LETTERING" && !letteringText.trim()) return "Enter the custom lettering text to continue.";
     if (activeStep === 0 && !designName.trim()) return "Give this design a name.";
     if (activeStep === 1 && mappings.length === 0) return "Choose at least one production color.";
     if (activeStep === 2 && (!product || !placement)) return "Choose a product and placement.";
@@ -384,7 +484,12 @@ export function EmbroideryConfigurator({
   }
 
   async function submitConfiguration() {
-    if (!artwork) {
+    if (designMode === "LETTERING" && !letteringText.trim()) {
+      setActiveStep(0);
+      setError("Enter the custom lettering text before submitting.");
+      return;
+    }
+    if (designMode === "ARTWORK" && !artwork) {
       setActiveStep(0);
       setError("Upload artwork before submitting.");
       return;
@@ -402,14 +507,19 @@ export function EmbroideryConfigurator({
     setUploadProgress(0);
 
     try {
+      const activeArtwork = designMode === "LETTERING"
+        ? await renderLetteringArtwork(letteringText.trim(), mappings[0]?.targetHex ?? "#1A1A1A")
+        : artwork!;
+      if (designMode === "LETTERING") setArtwork(activeArtwork);
+
       const blob = await upload(
-        `configurator/${uploadIntent.nonce}/${Date.now()}-${safeArtworkName(artwork.file.name)}`,
-        artwork.file,
+        `configurator/${uploadIntent.nonce}/${Date.now()}-${safeArtworkName(activeArtwork.file.name)}`,
+        activeArtwork.file,
         {
           access: "public",
           handleUploadUrl: "/api/public/configurator/upload",
           clientPayload: JSON.stringify({ uploadIntent: uploadIntent.token }),
-          multipart: artwork.file.size > 5 * 1024 * 1024,
+          multipart: activeArtwork.file.size > 5 * 1024 * 1024,
           onUploadProgress: ({ percentage }) => setUploadProgress(Math.round(percentage)),
         },
       );
@@ -432,13 +542,15 @@ export function EmbroideryConfigurator({
           artwork: {
             url: blob.url,
             pathname: blob.pathname,
-            fileName: artwork.file.name,
-            contentType: artwork.file.type,
-            fileSizeBytes: artwork.file.size,
-            widthPx: artwork.naturalWidth,
-            heightPx: artwork.naturalHeight,
+            fileName: activeArtwork.file.name,
+            contentType: activeArtwork.file.type,
+            fileSizeBytes: activeArtwork.file.size,
+            widthPx: activeArtwork.naturalWidth,
+            heightPx: activeArtwork.naturalHeight,
           },
           configuration: {
+            designMode,
+            lettering: designMode === "LETTERING" ? { text: letteringText.trim() } : null,
             designName: designName.trim(),
             productId: product.id,
             productName: product.name,
@@ -517,6 +629,18 @@ export function EmbroideryConfigurator({
             <div className={styles.stepPanel}>
               <StepHeading number="01" title="Choose the order, then add artwork." copy="Establish the product and quantity first so every size limit, placement, and estimate that follows is grounded in the right production setup." />
               <div className={styles.startSection}>
+                <div className={styles.startSectionHeading}><span>Design type</span><small>Upload your own artwork, or have a name or monogram lettered</small></div>
+                <fieldset className={styles.choiceGroup}>
+                  <legend className={styles.visuallyHidden}>Design type</legend>
+                  <button type="button" className={designMode === "ARTWORK" ? styles.choiceSelected : ""} onClick={() => setDesignMode("ARTWORK")} aria-pressed={designMode === "ARTWORK"}>
+                    <strong>Upload artwork</strong><small>Logo, crest, or custom graphic</small>
+                  </button>
+                  <button type="button" className={designMode === "LETTERING" ? styles.choiceSelected : ""} onClick={() => setDesignMode("LETTERING")} aria-pressed={designMode === "LETTERING"}>
+                    <strong>Custom lettering</strong><small>Name, initials, or monogram — priced per letter</small>
+                  </button>
+                </fieldset>
+              </div>
+              <div className={styles.startSection}>
                 <div className={styles.startSectionHeading}><span>Product</span><small>Select the object you want embroidered</small></div>
                 <div className={styles.productCards} aria-label="Embroidery products">
                   {catalog.products.map((item) => {
@@ -553,73 +677,108 @@ export function EmbroideryConfigurator({
                 </label>
                 <div className={styles.quantityPresets}>{[1, 12, 24, 48, 100, 250].map((amount) => <button key={amount} type="button" className={quantity === amount ? styles.selectedPill : ""} onClick={() => setQuantity(amount)} aria-pressed={quantity === amount}>{amount}</button>)}</div>
               </div>
-              <div className={styles.startSectionHeading}><span>Artwork</span><small>Transparent PNG or SVG gives the cleanest proof</small></div>
-              <div
-                className={`${styles.dropzone} ${dragging ? styles.dropzoneActive : ""}`}
-                onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  setDragging(false);
-                  const file = event.dataTransfer.files[0];
-                  if (file) void handleFile(file);
-                }}
-                onClick={() => inputRef.current?.click()}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") inputRef.current?.click();
-                }}
-                role="button"
-                tabIndex={0}
-              >
-                {artwork ? (
-                  <>
-                    <div className={styles.uploadedIcon}><ImagePlus size={24} /></div>
-                    <strong>{artwork.file.name}</strong>
-                    <span>{artwork.naturalWidth} × {artwork.naturalHeight} px · {formatBytes(artwork.file.size)}</span>
-                    <button type="button" onClick={(event) => { event.stopPropagation(); inputRef.current?.click(); }}>Replace artwork</button>
-                  </>
-                ) : (
-                  <>
-                    <UploadCloud size={28} aria-hidden />
-                    <strong>Drop artwork here</strong>
-                    <span>or select a file · PNG, JPG, WebP, SVG · 20 MB max</span>
-                    <button type="button">Choose artwork</button>
-                  </>
-                )}
-                <input
-                  ref={inputRef}
-                  className={styles.hiddenInput}
-                  type="file"
-                  accept={ACCEPTED_TYPES.join(",")}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void handleFile(file);
-                    event.target.value = "";
-                  }}
-                />
-              </div>
+              {designMode === "ARTWORK" && (
+                <>
+                  <div className={styles.startSectionHeading}><span>Artwork</span><small>Transparent PNG or SVG gives the cleanest proof</small></div>
+                  <div
+                    className={`${styles.dropzone} ${dragging ? styles.dropzoneActive : ""}`}
+                    onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      setDragging(false);
+                      const file = event.dataTransfer.files[0];
+                      if (file) void handleFile(file);
+                    }}
+                    onClick={() => inputRef.current?.click()}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") inputRef.current?.click();
+                    }}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    {artwork ? (
+                      <>
+                        <div className={styles.uploadedIcon}><ImagePlus size={24} /></div>
+                        <strong>{artwork.file.name}</strong>
+                        <span>{artwork.naturalWidth} × {artwork.naturalHeight} px · {formatBytes(artwork.file.size)}</span>
+                        <button type="button" onClick={(event) => { event.stopPropagation(); inputRef.current?.click(); }}>Replace artwork</button>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud size={28} aria-hidden />
+                        <strong>Drop artwork here</strong>
+                        <span>or select a file · PNG, JPG, WebP, SVG · 20 MB max</span>
+                        <button type="button">Choose artwork</button>
+                      </>
+                    )}
+                    <input
+                      ref={inputRef}
+                      className={styles.hiddenInput}
+                      type="file"
+                      accept={ACCEPTED_TYPES.join(",")}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) void handleFile(file);
+                        event.target.value = "";
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+              {designMode === "LETTERING" && (
+                <>
+                  <div className={styles.startSectionHeading}><span>Lettering</span><small>{money(LETTERING_RATE_PER_LETTER)} per letter, 1 thread color included</small></div>
+                  <label className={styles.field}>
+                    <span>Text to embroider</span>
+                    <input
+                      value={letteringText}
+                      onChange={(event) => setLetteringText(event.target.value.slice(0, 60))}
+                      placeholder="Amelia"
+                      maxLength={60}
+                    />
+                  </label>
+                  <div className={styles.analysisLine}>
+                    <Sparkles size={14} /> {countLetteringCharacters(letteringText)} billable character{countLetteringCharacters(letteringText) === 1 ? "" : "s"} · spaces are free
+                  </div>
+                </>
+              )}
               <label className={styles.field}>
                 <span>Design name</span>
                 <input value={designName} onChange={(event) => setDesignName(event.target.value)} placeholder="Family crest — left chest" maxLength={240} />
               </label>
-              {artwork && (
+              {designMode === "ARTWORK" && artwork && (
                 <label className={styles.toggleRow}>
                   <input type="checkbox" checked={removeLightBackground} onChange={(event) => setRemoveLightBackground(event.target.checked)} />
                   <span><strong>Remove a light background</strong><small>Useful for logos exported on white.</small></span>
                 </label>
               )}
-              {artwork && <div className={styles.analysisLine}><Sparkles size={14} /> {detectedColorCount.toLocaleString()} tonal values detected · preview reduced to {targetColorCount} thread colors</div>}
+              {designMode === "ARTWORK" && artwork && <div className={styles.analysisLine}><Sparkles size={14} /> {detectedColorCount.toLocaleString()} tonal values detected · preview reduced to {targetColorCount} thread colors</div>}
             </div>
           )}
 
           {activeStep === 1 && (
             <div className={styles.stepPanel}>
-              <StepHeading number="02" title="Translate color into thread." copy="We’ve matched the dominant artwork colors to the studio palette. Change any spool, then tune weight, density and edge finish." />
+              <StepHeading
+                number="02"
+                title="Translate color into thread."
+                copy={designMode === "LETTERING"
+                  ? "One thread color is included in the per-letter rate. Add spools for a two-tone or outlined treatment — each additional color adds a surcharge to the lettering price."
+                  : "We’ve matched the dominant artwork colors to the studio palette. Change any spool, then tune weight, density and edge finish."}
+              />
               <div className={styles.colorCountRow}>
-                <span>Production colors</span>
+                <span>{designMode === "LETTERING" ? "Lettering colors" : "Production colors"}</span>
                 <div>
-                  {[1, 2, 3, 4, 5, 6, 8].map((count) => (
-                    <button key={count} type="button" onClick={() => setTargetColorCount(count)} className={targetColorCount === count ? styles.selectedPill : ""} aria-pressed={targetColorCount === count}>{count}</button>
+                  {(designMode === "LETTERING" ? [1, 2, 3, 4] : [1, 2, 3, 4, 5, 6, 8]).map((count) => (
+                    <button
+                      key={count}
+                      type="button"
+                      onClick={() => designMode === "LETTERING" ? setLetteringColorCount(count) : setTargetColorCount(count)}
+                      className={(designMode === "LETTERING" ? letteringColorCount : targetColorCount) === count ? styles.selectedPill : ""}
+                      aria-pressed={(designMode === "LETTERING" ? letteringColorCount : targetColorCount) === count}
+                    >
+                      {count}
+                    </button>
                   ))}
                 </div>
               </div>
@@ -627,8 +786,12 @@ export function EmbroideryConfigurator({
                 {mappings.map((mapping) => (
                   <div className={styles.mappingRow} key={mapping.sequence}>
                     <span className={styles.mappingNumber}>{String(mapping.sequence).padStart(2, "0")}</span>
-                    <span className={styles.sourceSwatch} style={{ backgroundColor: mapping.sourceHex }} title={`Artwork ${mapping.sourceHex}`} />
-                    <ArrowRight size={14} aria-hidden />
+                    {designMode === "ARTWORK" && (
+                      <>
+                        <span className={styles.sourceSwatch} style={{ backgroundColor: mapping.sourceHex }} title={`Artwork ${mapping.sourceHex}`} />
+                        <ArrowRight size={14} aria-hidden />
+                      </>
+                    )}
                     <span className={styles.threadSwatch} style={{ backgroundColor: mapping.targetHex }} />
                     <label>
                       <span className={styles.visuallyHidden}>Thread for color {mapping.sequence}</span>
@@ -637,7 +800,7 @@ export function EmbroideryConfigurator({
                       </select>
                       <ChevronDown size={13} aria-hidden />
                     </label>
-                    <span className={styles.coverage}>{Math.round(mapping.coverage * 100)}%</span>
+                    {designMode === "ARTWORK" && <span className={styles.coverage}>{Math.round(mapping.coverage * 100)}%</span>}
                   </div>
                 ))}
               </div>
@@ -656,28 +819,32 @@ export function EmbroideryConfigurator({
                   <small><span>Dense</span><span>Open</span></small>
                 </label>
               </div>
-              <fieldset className={`${styles.choiceGroup} ${styles.constructionGroup}`}>
-                <legend>Stitch construction</legend>
-                {STITCH_STYLES.map((style) => (
-                  <button key={style} type="button" className={stitchStyle === style ? styles.choiceSelected : ""} onClick={() => setStitchStyle(style)} aria-pressed={stitchStyle === style}>
-                    <strong>{stitchStyleLabel(style)}</strong><small>{STITCH_STYLE_COPY[style]}</small>
-                  </button>
-                ))}
-              </fieldset>
-              <fieldset className={styles.borderGroup}>
-                <legend>Edge finish</legend>
-                {(["NONE", "SATIN", "MERROW"] as BorderStyle[]).map((style) => (
-                  <button key={style} type="button" className={borderStyle === style ? styles.choiceSelected : ""} onClick={() => setBorderStyle(style)} aria-pressed={borderStyle === style}>
-                    <span className={`${styles.borderSample} ${styles[`border${style}`]}`} />
-                    <strong>{style === "NONE" ? "No border" : style === "SATIN" ? "Satin edge" : "Merrow edge"}</strong>
-                  </button>
-                ))}
-              </fieldset>
-              {borderStyle !== "NONE" && (
-                <div className={styles.inlineFields}>
-                  <label className={styles.colorField}><span>Border color</span><input type="color" value={borderColor} onChange={(event) => setBorderColor(event.target.value.toUpperCase())} /><code>{borderColor}</code></label>
-                  <label className={styles.field}><span>Border width (mm)</span><input type="number" min="0.5" max="6" step="0.5" value={borderWidthMm} onChange={(event) => setBorderWidthMm(Number(event.target.value))} /></label>
-                </div>
+              {designMode === "ARTWORK" && (
+                <>
+                  <fieldset className={`${styles.choiceGroup} ${styles.constructionGroup}`}>
+                    <legend>Stitch construction</legend>
+                    {STITCH_STYLES.map((style) => (
+                      <button key={style} type="button" className={stitchStyle === style ? styles.choiceSelected : ""} onClick={() => setStitchStyle(style)} aria-pressed={stitchStyle === style}>
+                        <strong>{stitchStyleLabel(style)}</strong><small>{STITCH_STYLE_COPY[style]}</small>
+                      </button>
+                    ))}
+                  </fieldset>
+                  <fieldset className={styles.borderGroup}>
+                    <legend>Edge finish</legend>
+                    {(["NONE", "SATIN", "MERROW"] as BorderStyle[]).map((style) => (
+                      <button key={style} type="button" className={borderStyle === style ? styles.choiceSelected : ""} onClick={() => setBorderStyle(style)} aria-pressed={borderStyle === style}>
+                        <span className={`${styles.borderSample} ${styles[`border${style}`]}`} />
+                        <strong>{style === "NONE" ? "No border" : style === "SATIN" ? "Satin edge" : "Merrow edge"}</strong>
+                      </button>
+                    ))}
+                  </fieldset>
+                  {borderStyle !== "NONE" && (
+                    <div className={styles.inlineFields}>
+                      <label className={styles.colorField}><span>Border color</span><input type="color" value={borderColor} onChange={(event) => setBorderColor(event.target.value.toUpperCase())} /><code>{borderColor}</code></label>
+                      <label className={styles.field}><span>Border width (mm)</span><input type="number" min="0.5" max="6" step="0.5" value={borderWidthMm} onChange={(event) => setBorderWidthMm(Number(event.target.value))} /></label>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -712,6 +879,11 @@ export function EmbroideryConfigurator({
           {activeStep === 3 && (
             <div className={styles.stepPanel}>
               <StepHeading number="04" title="Prepare the studio request." copy={`Review the ${product.name} order for ${quantity} units, then add the contact who will receive proofs and secure order updates. No payment is taken here.`} />
+              {designMode === "LETTERING" && (
+                <div className={styles.analysisLine}>
+                  <Sparkles size={14} /> Custom lettering: “{letteringText.trim()}” · {countLetteringCharacters(letteringText)} letters · {mappings.length} color{mappings.length === 1 ? "" : "s"}
+                </div>
+              )}
               <fieldset className={styles.projectTypes}>
                 <legend>This project is for</legend>
                 {([
@@ -765,7 +937,16 @@ export function EmbroideryConfigurator({
                 onZoomChange={setPreviewZoom}
                 className={styles.threePreview}
               />
-              {!textureMaps?.colorUrl && <div className={styles.previewEmpty}>{processing ? <LoaderCircle className={styles.spinner} size={22} /> : <Maximize2 size={22} />}<span>{processing ? "Translating artwork into thread…" : "Your thread proof will appear here"}</span></div>}
+              {!textureMaps?.colorUrl && (
+                <div className={styles.previewEmpty}>
+                  {processing ? <LoaderCircle className={styles.spinner} size={22} /> : <Maximize2 size={22} />}
+                  <span>
+                    {designMode === "LETTERING"
+                      ? "The studio sends a digitized lettering proof after review"
+                      : processing ? "Translating artwork into thread…" : "Your thread proof will appear here"}
+                  </span>
+                </div>
+              )}
               <div className={styles.zoomControls} aria-label="Preview zoom controls">
                 <button type="button" aria-label="Zoom out" disabled={previewZoom <= 0.65} onClick={() => setPreviewZoom((value) => Math.max(0.65, Number((value - 0.25).toFixed(2))))}><ZoomOut size={14} /></button>
                 <button type="button" aria-label="Reset zoom" onClick={() => setPreviewZoom(1)}>{Math.round(previewZoom * 100)}%</button>
@@ -777,13 +958,23 @@ export function EmbroideryConfigurator({
               <div><span>Object</span><strong>{product.name}</strong></div>
               <div><span>Placement</span><strong>{placement.name}</strong></div>
               <div><span>Finished size</span><strong>{widthInches.toFixed(2)} × {heightInches.toFixed(2)} in</strong></div>
-              <div><span>Thread construction</span><strong title={`${stitchStyleLabel(stitchStyle)} · ${threadWeight.replace("W", "")} wt · ${mappings.length || targetColorCount} colors`}>{stitchStyleLabel(stitchStyle)} · {threadWeight.replace("W", "")} wt · {mappings.length || targetColorCount} colors</strong></div>
+              <div>
+                <span>Thread construction</span>
+                <strong>
+                  {designMode === "LETTERING"
+                    ? `Lettering · ${threadWeight.replace("W", "")} wt · ${mappings.length} colors`
+                    : `${stitchStyleLabel(stitchStyle)} · ${threadWeight.replace("W", "")} wt · ${mappings.length || targetColorCount} colors`}
+                </strong>
+              </div>
             </div>
           </div>
           <div className={styles.quoteCard}>
             <div><p className={styles.eyebrow}>Working estimate</p><strong className={styles.quoteTotal}>{money(quote.total)}</strong></div>
             <dl>
               <div><dt>One-time setup</dt><dd>{money(quote.setupFee)}</dd></div>
+              {designMode === "LETTERING" && (
+                <div><dt>{countLetteringCharacters(letteringText)} letters · {mappings.length} color{mappings.length === 1 ? "" : "s"}</dt><dd>{money(quote.unitDecoration)} / object</dd></div>
+              )}
               <div><dt>{quantity} objects · {money(quote.unitPrice)} each</dt><dd>{money(quote.unitPrice * quantity)}</dd></div>
               <div><dt>Estimated stitches</dt><dd>{quote.estimatedStitches.toLocaleString()}</dd></div>
               {quote.volumeSavings > 0 && <div className={styles.savings}><dt>Volume savings</dt><dd>−{money(quote.volumeSavings)}</dd></div>}

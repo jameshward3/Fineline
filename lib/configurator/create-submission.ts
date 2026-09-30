@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { head } from "@vercel/blob";
 import { prisma } from "@/lib/prisma";
-import { calculateConfiguratorQuote } from "./pricing";
+import { calculateConfiguratorQuote, calculateLetteringQuote } from "./pricing";
 import type { ConfiguratorSubmissionInput } from "./schema";
 import { getPublicStudioContext } from "./server-context";
 import { normalizePhoneNumber, phoneLookupCandidates } from "@/lib/portal/phone";
@@ -57,17 +57,24 @@ export async function createConfiguratorSubmission(data: ConfiguratorSubmissionI
 
   await verifyArtwork(data.artwork);
 
-  const quote = calculateConfiguratorQuote({
-    widthInches: data.configuration.widthInches,
-    heightInches: data.configuration.heightInches,
-    quantity: data.configuration.quantity,
-    colorCount: data.configuration.colors.length,
-    densityMm: data.configuration.densityMm,
-    threadWeight: data.configuration.threadWeight,
-    borderStyle: data.configuration.border.style,
-    borderWidthMm: data.configuration.border.widthMm,
-    productCategory: data.configuration.productCategory,
-  });
+  const quote = data.configuration.designMode === "LETTERING" && data.configuration.lettering
+    ? calculateLetteringQuote({
+        text: data.configuration.lettering.text,
+        quantity: data.configuration.quantity,
+        colorCount: data.configuration.colors.length,
+        productCategory: data.configuration.productCategory,
+      })
+    : calculateConfiguratorQuote({
+        widthInches: data.configuration.widthInches,
+        heightInches: data.configuration.heightInches,
+        quantity: data.configuration.quantity,
+        colorCount: data.configuration.colors.length,
+        densityMm: data.configuration.densityMm,
+        threadWeight: data.configuration.threadWeight,
+        borderStyle: data.configuration.border.style,
+        borderWidthMm: data.configuration.border.widthMm,
+        productCategory: data.configuration.productCategory,
+      });
 
   const existing = await prisma.configuratorSubmission.findUnique({
     where: { idempotencyKey: data.idempotencyKey },
@@ -271,6 +278,9 @@ export async function createConfiguratorSubmission(data: ConfiguratorSubmissionI
 
     const noteBody = [
       "Public embroidery configuration from fineligne.co/configure",
+      data.configuration.designMode === "LETTERING" && data.configuration.lettering
+        ? `Custom lettering: "${data.configuration.lettering.text}"`
+        : "",
       `Product: ${data.configuration.productName}`,
       `Placement: ${data.configuration.placementName}`,
       `Size: ${data.configuration.widthInches.toFixed(2)} × ${data.configuration.heightInches.toFixed(2)} in`,

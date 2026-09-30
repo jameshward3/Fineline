@@ -24,7 +24,13 @@ export const configuratorArtworkSchema = z.object({
   heightPx: z.number().int().positive().max(30_000).nullable().optional(),
 });
 
+export const configuratorLetteringSchema = z.object({
+  text: z.string().trim().min(1).max(60),
+});
+
 export const configuratorConfigurationSchema = z.object({
+  designMode: z.enum(["ARTWORK", "LETTERING"]).optional().default("ARTWORK"),
+  lettering: configuratorLetteringSchema.nullable().optional().default(null),
   designName: z.string().min(1).max(240),
   productId: z.string().max(200).nullable(),
   productName: z.string().min(1).max(240),
@@ -48,7 +54,10 @@ export const configuratorConfigurationSchema = z.object({
   }),
   quantity: z.number().int().min(1).max(5000),
   notes: z.string().max(12_000).optional().default(""),
-});
+}).refine(
+  (config) => config.designMode !== "LETTERING" || config.lettering !== null,
+  { message: "Enter the custom lettering text.", path: ["lettering"] },
+);
 
 export const configuratorSubmissionSchema = z.object({
   idempotencyKey: z.string().min(8).max(200),
@@ -72,3 +81,4 @@ export const configuratorSubmissionSchema = z.object({
 export type ConfiguratorSubmissionInput = z.infer<typeof configuratorSubmissionSchema>;
 export type ConfiguratorConfiguration = z.infer<typeof configuratorConfigurationSchema>;
 export type ConfiguratorThreadMapping = z.infer<typeof threadMappingSchema>;
+export type ConfiguratorLettering = z.infer<typeof configuratorLetteringSchema>;

@@ -92,3 +92,66 @@ export function calculateConfiguratorQuote(input: PricingInput): ConfiguratorQuo
     total: subtotal,
   };
 }
+
+export const LETTERING_SETUP_FEE = 10;
+export const LETTERING_RATE_PER_LETTER = 1.5;
+/** Applied per thread color beyond the first, e.g. 0.25 = +25% per extra color. */
+export const LETTERING_COLOR_SURCHARGE_RATE = 0.25;
+/** Roughly 300–600 stitches per letter is typical for digitized block/script
+ * lettering; used only for the informational stitch-count estimate shown to
+ * the customer — the studio confirms actual digitizing during production. */
+const STITCHES_PER_LETTER_ESTIMATE = 450;
+
+export interface LetteringPricingInput {
+  text: string;
+  quantity: number;
+  colorCount: number;
+  productCategory: string;
+}
+
+/** Counts billable characters: letters, numbers, and punctuation, but not whitespace. */
+export function countLetteringCharacters(text: string): number {
+  return text.replace(/\s+/g, "").length;
+}
+
+function letteringColorMultiplier(colorCount: number): number {
+  return 1 + LETTERING_COLOR_SURCHARGE_RATE * Math.max(0, colorCount - 1);
+}
+
+/**
+ * Pricing for custom lettering/monogramming (no uploaded artwork): a flat
+ * setup fee plus a per-letter rate that includes one thread color, with a
+ * surcharge multiplier for each additional color. Shares the same
+ * ConfiguratorQuote shape as calculateConfiguratorQuote so the rest of the
+ * configurator (review step, submission, admin views) doesn't need to know
+ * which pricing mode produced it.
+ */
+export function calculateLetteringQuote(input: LetteringPricingInput): ConfiguratorQuote {
+  const quantity = Math.round(clamp(input.quantity, 1, 5000));
+  const colors = Math.round(clamp(input.colorCount, 1, 12));
+  const letterCount = clamp(countLetteringCharacters(input.text), 1, 60);
+
+  const setupFee = roundMoney(LETTERING_SETUP_FEE);
+  const unitProduct = roundMoney(categoryBasePrice(input.productCategory));
+  const rawDecoration = letterCount * LETTERING_RATE_PER_LETTER * letteringColorMultiplier(colors);
+  const discount = volumeDiscount(quantity);
+  const unitDecoration = roundMoney(rawDecoration * (1 - discount));
+  const unitPrice = roundMoney(unitProduct + unitDecoration);
+  const undiscounted = setupFee + quantity * (unitProduct + rawDecoration);
+  const subtotal = roundMoney(setupFee + quantity * unitPrice);
+
+  return {
+    version: CONFIGURATOR_PRICING_VERSION,
+    currency: "USD",
+    quantity,
+    estimatedStitches: Math.round(letterCount * STITCHES_PER_LETTER_ESTIMATE * (0.85 + colors * 0.075)),
+    setupFee,
+    unitProduct,
+    unitDecoration,
+    unitPrice,
+    volumeDiscountRate: discount,
+    volumeSavings: roundMoney(Math.max(0, undiscounted - subtotal)),
+    subtotal,
+    total: subtotal,
+  };
+}
