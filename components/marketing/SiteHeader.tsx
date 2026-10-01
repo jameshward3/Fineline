@@ -18,9 +18,12 @@ export function SiteHeader() {
       <div className="mx-auto flex h-[88px] max-w-[1440px] items-center justify-between px-6 sm:px-10 lg:px-16">
         <Link href="/" className="flex items-center gap-2 text-fl-charcoal" onClick={() => setOpen(false)}>
           <svg viewBox="-100 -110 200 230" className="h-12 w-12" aria-hidden>
-            <LogoLockup id="header-mark" showThread className="text-fl-charcoal" />
+            <LogoLockup id="header-mark" showThread showWordmark={false} className="text-fl-charcoal" />
           </svg>
-          <span className="font-serif text-sm tracking-[0.16em]">FINE LIGNE <span className="block text-[7px] tracking-[.45em]">STUDIO</span></span>
+          <span className="flex flex-col items-center font-serif text-sm tracking-[0.16em]">
+            <span>FINE LIGNE</span>
+            <span className="text-[7px] tracking-[.45em]">STUDIO</span>
+          </span>
         </Link>
 
         <nav className="hidden items-center gap-[38px] lg:flex" aria-label="Primary navigation">

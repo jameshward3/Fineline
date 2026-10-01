@@ -730,7 +730,7 @@ export function EmbroideryConfigurator({
       {!embedded && (
         <header className={styles.header}>
           <Link href="/" className={styles.brand} aria-label="Fine Line Studio home">
-            <svg viewBox="-115 -120 230 260" aria-hidden><LogoLockup id="configurator-brand" showThread /></svg>
+            <svg viewBox="-115 -120 230 260" aria-hidden><LogoLockup id="configurator-brand" showThread showWordmark={false} /></svg>
             <span><strong>FINE LINE</strong><small>STUDIO</small></span>
           </Link>
           <div className={styles.secureLabel}><Lock size={12} aria-hidden /> Secure artwork intake</div>

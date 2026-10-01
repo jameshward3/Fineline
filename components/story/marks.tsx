@@ -64,15 +64,27 @@ export function WordmarkGroup({ id, className }: { id: string; className?: strin
   );
 }
 
-/** Full lockup using the Fine Ligne Studio wordmark. */
-export function LogoLockup({ id, className, showThread = true }: { id: string; className?: string; showThread?: boolean }) {
+/** Full lockup using the Fine Ligne Studio wordmark. Pass showWordmark={false}
+ *  where a separate linear text wordmark already sits next to the mark, so
+ *  the stacked FINE/LIGNE/STUDIO text isn't duplicated. */
+export function LogoLockup({
+  id,
+  className,
+  showThread = true,
+  showWordmark = true,
+}: {
+  id: string;
+  className?: string;
+  showThread?: boolean;
+  showWordmark?: boolean;
+}) {
   return (
     <g id={id} className={className}>
-      <g transform="translate(0,-58) scale(0.62)" style={{ strokeWidth: 2.4 }}>
+      <g transform={showWordmark ? "translate(0,-58) scale(0.62)" : "translate(35,9) scale(0.62)"} style={{ strokeWidth: 2.4 }}>
         <NeedleShape id={`${id}-needle`} className="fill-current stroke-none" />
         {showThread && <ThreadSwirl id={`${id}-thread`} className="stroke-current" />}
       </g>
-      <WordmarkGroup id={`${id}-wordmark`} />
+      {showWordmark && <WordmarkGroup id={`${id}-wordmark`} />}
     </g>
   );
 }

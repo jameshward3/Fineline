@@ -22,42 +22,44 @@ const adapter = new PrismaPg({
 });
 const prisma = new PrismaClient({ adapter });
 
+const THREAD_MANUFACTURER = "Richword";
+
 const PALETTE_ORDER = [
-  { name: "Bright White", code: "1001", hex: "#F5F3EA" },
-  { name: "Black", code: "1000", hex: "#1A1A1A" },
-  { name: "Navy", code: "1243", hex: "#17375E" },
-  { name: "Royal Blue", code: "1912", hex: "#1F4E9C" },
-  { name: "Red", code: "1147", hex: "#C41230" },
-  { name: "Yellow", code: "1122", hex: "#FFD100" },
-  { name: "Kelly Green", code: "1246", hex: "#00843D" },
-  { name: "Orange", code: "1168", hex: "#F4661C" },
-  { name: "Purple", code: "1327", hex: "#5B2C83" },
-  { name: "Gray", code: "1288", hex: "#8B8D8F" },
-  { name: "Tan", code: "1170", hex: "#C9A876" },
-  { name: "Brown", code: "1082", hex: "#5C4033" },
-  { name: "Pink", code: "1503", hex: "#F2A0C9" },
-  { name: "Light Blue", code: "1841", hex: "#6EC6E8" },
-  { name: "Gold", code: "1012", hex: "#C9A227" },
+  { name: "Black", code: "402", hex: "#171717" },
+  { name: "Golden Orange", code: "708", hex: "#E89B16" },
+  { name: "Bright Yellow", code: "822", hex: "#F4C51B" },
+  { name: "Light Aqua", code: "323", hex: "#7CCDD0" },
+  { name: "Lime Green", code: "204", hex: "#91C632" },
+  { name: "Coral Pink", code: "48", hex: "#F58E94" },
+  { name: "Blush Pink", code: "187", hex: "#E8C4BF" },
+  { name: "Peach / Tan", code: "864", hex: "#C98D6C" },
+  { name: "Orange Red", code: "181", hex: "#EF4D22" },
+  { name: "Bright Red", code: "519", hex: "#D71920" },
+  { name: "Forest Green", code: "725", hex: "#315D45" },
+  { name: "Bright Turquoise Blue", code: "334", hex: "#0097BF" },
+  { name: "Charcoal Gray", code: "179", hex: "#555552" },
+  { name: "White", code: "401", hex: "#F1F0E9" },
+  { name: "Royal Purple", code: "1129", hex: "#663C7B" },
 ] as const;
 
 // Machine 01 needle load order (per the production floor's current setup) —
 // deliberately not the same order as the company palette above.
 const MACHINE_NEEDLE_ORDER = [
-  "Bright White",
+  "White",
   "Black",
-  "Red",
-  "Navy",
-  "Royal Blue",
-  "Yellow",
-  "Kelly Green",
-  "Orange",
-  "Gray",
-  "Gold",
-  "Tan",
-  "Brown",
-  "Pink",
-  "Light Blue",
-  "Purple",
+  "Bright Red",
+  "Bright Turquoise Blue",
+  "Golden Orange",
+  "Bright Yellow",
+  "Forest Green",
+  "Orange Red",
+  "Charcoal Gray",
+  "Royal Purple",
+  "Peach / Tan",
+  "Lime Green",
+  "Coral Pink",
+  "Light Aqua",
+  "Blush Pink",
 ];
 
 export async function main() {
@@ -137,7 +139,12 @@ export async function main() {
     }),
   ]);
 
-  const madeira = await prisma.threadManufacturer.upsert({
+  const richword = await prisma.threadManufacturer.upsert({
+    where: { organizationId_name: { organizationId: org.id, name: THREAD_MANUFACTURER } },
+    update: {},
+    create: { organizationId: org.id, name: THREAD_MANUFACTURER },
+  });
+  await prisma.threadManufacturer.upsert({
     where: { organizationId_name: { organizationId: org.id, name: "Madeira" } },
     update: {},
     create: { organizationId: org.id, name: "Madeira" },
@@ -161,14 +168,14 @@ export async function main() {
       where: {
         organizationId_manufacturerId_manufacturerCode: {
           organizationId: org.id,
-          manufacturerId: madeira.id,
+          manufacturerId: richword.id,
           manufacturerCode: t.code,
         },
       },
       update: {},
       create: {
         organizationId: org.id,
-        manufacturerId: madeira.id,
+        manufacturerId: richword.id,
         manufacturerCode: t.code,
         manufacturerName: t.name,
         companyName: t.name,
@@ -523,12 +530,12 @@ export async function main() {
   });
 
   const shieldColors: { name: string; sequence: number }[] = [
-    { name: "Bright White", sequence: 1 },
-    { name: "Red", sequence: 2 },
-    { name: "Navy", sequence: 3 },
-    { name: "Gold", sequence: 4 },
+    { name: "White", sequence: 1 },
+    { name: "Bright Red", sequence: 2 },
+    { name: "Bright Turquoise Blue", sequence: 3 },
+    { name: "Golden Orange", sequence: 4 },
     { name: "Black", sequence: 5 },
-    { name: "Royal Blue", sequence: 6 },
+    { name: "Light Aqua", sequence: 6 },
   ];
   for (const c of shieldColors) {
     const thread = threadByName.get(c.name)!;
@@ -547,10 +554,10 @@ export async function main() {
   }
 
   const shieldLayers: { name: string; color: string; stitch: "SATIN_STITCH" | "TATAMI_FILL" | "RUNNING_STITCH"; order: number }[] = [
-    { name: "White Base", color: "Bright White", stitch: "TATAMI_FILL", order: 1 },
-    { name: "Red Fill", color: "Red", stitch: "TATAMI_FILL", order: 2 },
-    { name: "Navy Fill", color: "Navy", stitch: "TATAMI_FILL", order: 3 },
-    { name: "White Lettering", color: "Bright White", stitch: "SATIN_STITCH", order: 4 },
+    { name: "White Base", color: "White", stitch: "TATAMI_FILL", order: 1 },
+    { name: "Red Fill", color: "Bright Red", stitch: "TATAMI_FILL", order: 2 },
+    { name: "Navy Fill", color: "Bright Turquoise Blue", stitch: "TATAMI_FILL", order: 3 },
+    { name: "White Lettering", color: "White", stitch: "SATIN_STITCH", order: 4 },
     { name: "Black Outline", color: "Black", stitch: "RUNNING_STITCH", order: 5 },
   ];
   for (const layer of shieldLayers) {
@@ -826,7 +833,7 @@ export async function main() {
     }),
   ]);
 
-  for (const name of ["Gold", "Navy", "Bright White"]) {
+  for (const name of ["Golden Orange", "Bright Turquoise Blue", "White"]) {
     const thread = threadByName.get(name)!;
     await prisma.programThreadColor.upsert({
       where: { programId_threadColorId: { programId: hathawayProgram.id, threadColorId: thread.id } },
@@ -834,7 +841,7 @@ export async function main() {
       create: {
         programId: hathawayProgram.id,
         threadColorId: thread.id,
-        roleLabel: name === "Gold" ? "Primary" : "Accent",
+        roleLabel: name === "Golden Orange" ? "Primary" : "Accent",
       },
     });
   }
@@ -883,7 +890,7 @@ export async function main() {
     },
   });
 
-  const goldThread = threadByName.get("Gold")!;
+  const goldThread = threadByName.get("Golden Orange")!;
   await prisma.monogramProfile.upsert({
     where: { id: "monogram_james_ward" },
     update: {},
