@@ -26,6 +26,10 @@ export interface PublicProduct {
 
 export interface ConfiguratorCatalog {
   threads: PublicThreadColor[];
+  /** Colors currently threaded on an active machine needle — what custom
+   * lettering actually picks from, since it runs without a separate color
+   * re-threading/matching pass. Empty when no machine reports loaded colors. */
+  loadedThreads: PublicThreadColor[];
   products: PublicProduct[];
   source: "database" | "fallback";
 }
@@ -95,19 +99,17 @@ export const DEFAULT_PRODUCTS: PublicProduct[] = [
 
 export const FALLBACK_CATALOG: ConfiguratorCatalog = {
   threads: DEFAULT_THREAD_COLORS,
+  loadedThreads: DEFAULT_THREAD_COLORS.slice(0, 4),
   products: DEFAULT_PRODUCTS,
   source: "fallback",
 };
 
-export function categoryBasePrice(category: string): number {
-  const normalized = category.toLowerCase();
-  if (normalized.includes("oxford")) return 42;
-  if (normalized.includes("polo")) return 29;
-  if (normalized.includes("hood")) return 39;
-  if (normalized.includes("hat") || normalized.includes("cap")) return 24;
-  if (normalized.includes("patch")) return 7;
-  if (normalized.includes("t-shirt") || normalized.includes("tee")) return 18;
-  if (normalized.includes("bag") || normalized.includes("tote")) return 26;
-  if (normalized.includes("linen") || normalized.includes("towel")) return 22;
-  return 24;
+/**
+ * Every item is currently customer-supplied — the studio doesn't sell the
+ * blank, so there's no per-unit product charge for any category. Kept as a
+ * function (rather than inlining 0 at call sites) so real catalog pricing is
+ * a one-line change to restore once the studio stocks blanks again.
+ */
+export function categoryBasePrice(_category: string): number {
+  return 0;
 }

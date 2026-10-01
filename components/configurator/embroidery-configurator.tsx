@@ -31,9 +31,7 @@ import { loadImageFile, formatBytes } from "@/lib/wizard/canvas-utils";
 import { deltaE76, hexToLab } from "@/lib/color";
 import {
   FALLBACK_CATALOG,
-  categoryBasePrice,
   type ConfiguratorCatalog,
-  type PublicProduct,
   type PublicThreadColor,
 } from "@/lib/configurator/catalog";
 import { createThreadTextureMaps, prepareArtworkBuffer, type ThreadTextureMaps } from "@/lib/configurator/artwork-texture";
@@ -46,6 +44,12 @@ import {
   type ThreadWeightChoice,
 } from "@/lib/configurator/pricing";
 import { STITCH_STYLES, stitchStyleLabel, type StitchStyle } from "@/lib/configurator/stitch-simulation";
+import {
+  LETTERING_FONTS,
+  ensureLetteringFontLoaded,
+  letteringFontOption,
+  type LetteringFont,
+} from "@/lib/configurator/lettering-fonts";
 import type { ConfiguratorThreadMapping } from "@/lib/configurator/schema";
 import type { ConfiguratorUploadIntent } from "@/lib/configurator/upload-intent";
 import styles from "./embroidery-configurator.module.css";
@@ -56,7 +60,7 @@ const EmbroideryPreview3D = dynamic(
 );
 
 const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/svg+xml"] as const;
-const STEPS = ["Product, quantity & artwork", "Thread & finish", "Size & placement", "Review & submit"] as const;
+const STEPS = ["Item, quantity & design", "Thread & finish", "Size & placement", "Review & submit"] as const;
 const STITCH_STYLE_COPY: Record<StitchStyle, string> = {
   AUTO: "Adapts to each shape",
   PATCH: "Layered badge depth",
@@ -64,6 +68,19 @@ const STITCH_STYLE_COPY: Record<StitchStyle, string> = {
   TATAMI: "Compact woven fill",
 };
 const EMPTY_STITCH_LAYERS: ThreadTextureMaps["stitchLayers"] = [];
+
+type ObjectType = "SHIRT" | "HAT" | "JACKET" | "BAG" | "ACCESSORY" | "OTHER";
+const OBJECT_TYPES: { value: ObjectType; label: string }[] = [
+  { value: "SHIRT", label: "Shirt" },
+  { value: "HAT", label: "Hat" },
+  { value: "JACKET", label: "Jacket" },
+  { value: "BAG", label: "Bag" },
+  { value: "ACCESSORY", label: "Accessory" },
+  { value: "OTHER", label: "Other" },
+];
+/** All items are currently customer-supplied — the studio doesn't sell the
+ * blank, so there's no per-unit product charge regardless of object type. */
+const DEFAULT_PLACEMENT_MAX_INCHES = 12;
 
 interface ArtworkState {
   file: File;
@@ -87,10 +104,6 @@ interface EmbroideryConfiguratorProps {
   headingLevel?: "h1" | "h2";
   uploadIntent: ConfiguratorUploadIntent;
   blobStorageReady: boolean;
-}
-
-function catalogKey(item: { id: string | null; name: string }) {
-  return item.id ?? `fallback:${item.name}`;
 }
 
 function threadKey(thread: PublicThreadColor) {
@@ -153,31 +166,67 @@ function safeArtworkName(fileName: string) {
   return normalized.replace(/^-+|-+$/g, "").slice(-180) || "artwork.png";
 }
 
+const LETTERING_FONT_SIZE = 220;
+const LETTERING_PADDING_X = 60;
+const LETTERING_PADDING_Y = 90;
+
+interface LetteringGlyph {
+  char: string;
+  x: number;
+  width: number;
+}
+
+interface LetteringLayout {
+  width: number;
+  height: number;
+  glyphs: LetteringGlyph[];
+}
+
+/** Lays out each character's x-position once so the final artwork render and
+ * the live 3D-preview render stay pixel-consistent with each other. */
+function layoutLettering(text: string, cssFont: string): LetteringLayout {
+  const measure = document.createElement("canvas").getContext("2d");
+  if (!measure) throw new Error("Could not measure the lettering text.");
+  measure.font = `700 ${LETTERING_FONT_SIZE}px ${cssFont}`;
+  let cursorX = LETTERING_PADDING_X;
+  const glyphs: LetteringGlyph[] = [];
+  for (const char of text) {
+    const width = measure.measureText(char).width;
+    glyphs.push({ char, x: cursorX, width });
+    cursorX += width;
+  }
+  return {
+    width: Math.max(1, Math.ceil(cursorX)) + LETTERING_PADDING_X,
+    height: Math.round(LETTERING_FONT_SIZE * 1.4) + LETTERING_PADDING_Y * 2,
+    glyphs,
+  };
+}
+
 /**
  * Custom lettering doesn't come from an uploaded file, but submission still
  * requires a real artwork image (the studio reviews a proof either way and
  * downstream storage/DB plumbing all expects one). Render the text onto a
- * canvas and package it exactly like a user upload so the rest of the
- * pipeline — upload, verification, ArtworkAsset — needs no special-casing.
+ * canvas — each billable character in its own color, cycling through the
+ * selected spools — and package it exactly like a user upload so the rest of
+ * the pipeline — upload, verification, ArtworkAsset — needs no special-casing.
  */
-async function renderLetteringArtwork(text: string, colorHex: string): Promise<ArtworkState> {
-  const fontSize = 220;
-  const paddingX = 60;
-  const paddingY = 90;
-  const measure = document.createElement("canvas").getContext("2d");
-  if (!measure) throw new Error("Could not render the lettering preview.");
-  measure.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
-  const textWidth = Math.max(1, Math.ceil(measure.measureText(text).width));
-
+async function renderLetteringArtwork(text: string, cssFont: string, colorHexes: string[]): Promise<ArtworkState> {
+  const layout = layoutLettering(text, cssFont);
   const canvas = document.createElement("canvas");
-  canvas.width = textWidth + paddingX * 2;
-  canvas.height = fontSize + paddingY * 2;
+  canvas.width = layout.width;
+  canvas.height = layout.height;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Could not render the lettering preview.");
-  ctx.font = `700 ${fontSize}px Georgia, "Times New Roman", serif`;
-  ctx.fillStyle = colorHex;
+  ctx.font = `700 ${LETTERING_FONT_SIZE}px ${cssFont}`;
   ctx.textBaseline = "middle";
-  ctx.fillText(text, paddingX, canvas.height / 2);
+
+  let colorIndex = 0;
+  for (const glyph of layout.glyphs) {
+    if (glyph.char.trim() === "") continue;
+    ctx.fillStyle = colorHexes[colorIndex % Math.max(1, colorHexes.length)] ?? "#1A1A1A";
+    ctx.fillText(glyph.char, glyph.x, layout.height / 2);
+    colorIndex++;
+  }
 
   const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((result) => (result ? resolve(result) : reject(new Error("Could not render the lettering preview."))), "image/png");
@@ -187,15 +236,61 @@ async function renderLetteringArtwork(text: string, colorHex: string): Promise<A
   return { file, buffer, naturalWidth: canvas.width, naturalHeight: canvas.height };
 }
 
+/**
+ * Builds the alpha mask + per-pixel color-cluster assignment the 3D preview's
+ * thread-texture pipeline needs, without running real color quantization —
+ * each billable character's pixels are tagged with its own cluster index
+ * (cycling through the selected color count) as it's drawn, so there's no
+ * color-matching/anti-aliasing ambiguity to resolve afterward.
+ */
+function buildLetteringClusterPixels(text: string, cssFont: string, colorCount: number): { buffer: PixelBuffer; clusters: Int16Array } {
+  const layout = layoutLettering(text, cssFont);
+  const { width, height } = layout;
+  const clusters = new Int16Array(width * height).fill(-1);
+  const alpha = new Uint8ClampedArray(width * height);
+
+  let colorIndex = 0;
+  for (const glyph of layout.glyphs) {
+    if (glyph.char.trim() === "") continue;
+    const clusterIndex = colorIndex % Math.max(1, colorCount);
+    const glyphWidth = Math.max(1, Math.ceil(glyph.width) + 20);
+    const glyphCanvas = document.createElement("canvas");
+    glyphCanvas.width = glyphWidth;
+    glyphCanvas.height = height;
+    const gctx = glyphCanvas.getContext("2d");
+    if (!gctx) continue;
+    gctx.font = `700 ${LETTERING_FONT_SIZE}px ${cssFont}`;
+    gctx.textBaseline = "middle";
+    gctx.fillStyle = "#000000";
+    gctx.fillText(glyph.char, 10, height / 2);
+    const glyphData = gctx.getImageData(0, 0, glyphWidth, height).data;
+    const destX = Math.round(glyph.x - 10);
+    for (let gy = 0; gy < height; gy++) {
+      for (let gx = 0; gx < glyphWidth; gx++) {
+        const a = glyphData[(gy * glyphWidth + gx) * 4 + 3];
+        if (a <= 10) continue;
+        const destXAbs = destX + gx;
+        if (destXAbs < 0 || destXAbs >= width) continue;
+        const destIndex = gy * width + destXAbs;
+        clusters[destIndex] = clusterIndex;
+        if (a > alpha[destIndex]) alpha[destIndex] = a;
+      }
+    }
+    colorIndex++;
+  }
+
+  const bufferData = new Uint8ClampedArray(width * height * 4);
+  for (let i = 0, p = 0; i < width * height; i++, p += 4) {
+    bufferData[p + 3] = alpha[i];
+  }
+  return { buffer: { data: bufferData, width, height }, clusters };
+}
+
 function hasTransparentPixels(buffer: PixelBuffer) {
   for (let offset = 3; offset < buffer.data.length; offset += 4) {
     if (buffer.data[offset] < 245) return true;
   }
   return false;
-}
-
-function productFor(catalog: ConfiguratorCatalog, key: string): PublicProduct {
-  return catalog.products.find((product) => catalogKey(product) === key) ?? catalog.products[0];
 }
 
 function money(value: number) {
@@ -221,6 +316,7 @@ export function EmbroideryConfigurator({
   const [activeStep, setActiveStep] = useState(0);
   const [designMode, setDesignMode] = useState<"ARTWORK" | "LETTERING">("ARTWORK");
   const [letteringText, setLetteringText] = useState("");
+  const [letteringFont, setLetteringFont] = useState<LetteringFont>("SANS");
   const [letteringColorCount, setLetteringColorCount] = useState(1);
   const [artwork, setArtwork] = useState<ArtworkState | null>(null);
   const [quantized, setQuantized] = useState<QuantizedState | null>(null);
@@ -237,8 +333,8 @@ export function EmbroideryConfigurator({
   const [borderStyle, setBorderStyle] = useState<BorderStyle>("NONE");
   const [borderColor, setBorderColor] = useState("#1A1A1A");
   const [borderWidthMm, setBorderWidthMm] = useState(2);
-  const [productKey, setProductKey] = useState(catalogKey(FALLBACK_CATALOG.products[0]));
-  const [placementKey, setPlacementKey] = useState(catalogKey(FALLBACK_CATALOG.products[0].placements[0]));
+  const [objectType, setObjectType] = useState<ObjectType>("SHIRT");
+  const [placementName, setPlacementName] = useState("");
   const [garmentColor, setGarmentColor] = useState("#E9E1D4");
   const [widthInches, setWidthInches] = useState(3.5);
   const [heightInches, setHeightInches] = useState(2.5);
@@ -256,37 +352,27 @@ export function EmbroideryConfigurator({
   const [submitting, setSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const product = productFor(catalog, productKey);
-  const placement = product.placements.find((item) => catalogKey(item) === placementKey) ?? product.placements[0];
   const sourceAspect = artwork ? artwork.naturalWidth / artwork.naturalHeight : widthInches / heightInches;
+  const objectTypeLabel = OBJECT_TYPES.find((item) => item.value === objectType)?.label ?? "Item";
+  // Lettering runs without a separate color re-matching pass, so it only
+  // offers what's actually threaded on a machine right now; fall back to the
+  // full catalog if no machine has reported loaded colors yet.
+  const letteringThreadChoices = catalog.loadedThreads.length > 0 ? catalog.loadedThreads : catalog.threads;
+  const threadChoicesForMode = designMode === "LETTERING" ? letteringThreadChoices : catalog.threads;
 
   useEffect(() => {
     let cancelled = false;
     fetch("/api/public/configurator/options")
       .then((response) => response.json())
       .then((data: ConfiguratorCatalog) => {
-        if (cancelled || !data.products?.length || !data.threads?.length) return;
+        if (cancelled || !data.threads?.length) return;
         setCatalog(data);
-        setProductKey((current) => data.products.some((item) => catalogKey(item) === current) ? current : catalogKey(data.products[0]));
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (!product?.placements.length) return;
-    if (!product.placements.some((item) => catalogKey(item) === placementKey)) {
-      setPlacementKey(catalogKey(product.placements[0]));
-    }
-  }, [placementKey, product]);
-
-  useEffect(() => {
-    if (!placement) return;
-    setWidthInches((value) => Math.min(value, placement.maxWidthInches));
-    setHeightInches((value) => Math.min(value, placement.maxHeightInches));
-  }, [placement]);
 
   useEffect(() => {
     if (!artwork || designMode !== "ARTWORK") return;
@@ -316,8 +402,8 @@ export function EmbroideryConfigurator({
 
   useEffect(() => {
     if (designMode !== "LETTERING") return;
-    setMappings(letteringMappingsFor(letteringColorCount, catalog.threads));
-  }, [designMode, letteringColorCount, catalog.threads]);
+    setMappings(letteringMappingsFor(letteringColorCount, letteringThreadChoices));
+  }, [designMode, letteringColorCount, letteringThreadChoices]);
 
   useEffect(() => {
     if (designMode !== "LETTERING" || !letteringText.trim()) return;
@@ -329,6 +415,7 @@ export function EmbroideryConfigurator({
   }, [designMode, letteringText]);
 
   useEffect(() => {
+    if (designMode !== "ARTWORK") return;
     if (!quantized || mappings.length !== quantized.palette.length) {
       setTextureMaps(null);
       return;
@@ -347,7 +434,43 @@ export function EmbroideryConfigurator({
       }));
     }, 24);
     return () => window.clearTimeout(timer);
-  }, [borderColor, borderStyle, borderWidthMm, densityMm, mappings, quantized, stitchStyle, threadWeight]);
+  }, [borderColor, borderStyle, borderWidthMm, densityMm, designMode, mappings, quantized, stitchStyle, threadWeight]);
+
+  useEffect(() => {
+    if (designMode !== "LETTERING") return;
+    const text = letteringText.trim();
+    if (!text || mappings.length === 0) {
+      setTextureMaps(null);
+      return;
+    }
+    let cancelled = false;
+    setProcessing(true);
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        await ensureLetteringFontLoaded(letteringFont);
+        if (cancelled) return;
+        const cssFont = letteringFontOption(letteringFont).cssFont;
+        const { buffer, clusters } = buildLetteringClusterPixels(text, cssFont, mappings.length);
+        if (cancelled) return;
+        setTextureMaps(createThreadTextureMaps({
+          buffer,
+          clusters,
+          targetHexes: mappings.map((mapping) => mapping.targetHex),
+          borderStyle: "NONE",
+          borderColor: "#1A1A1A",
+          borderWidthMm: 0,
+          densityMm,
+          threadWeight,
+          stitchStyle: "SATIN",
+        }));
+        setProcessing(false);
+      })();
+    }, 280);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [densityMm, designMode, letteringFont, letteringText, mappings, threadWeight]);
 
   const quote = useMemo(() => {
     if (designMode === "LETTERING") {
@@ -355,7 +478,7 @@ export function EmbroideryConfigurator({
         text: letteringText,
         quantity,
         colorCount: Math.max(1, mappings.length),
-        productCategory: product.category,
+        productCategory: objectType,
       });
     }
     return calculateConfiguratorQuote({
@@ -367,7 +490,7 @@ export function EmbroideryConfigurator({
       threadWeight,
       borderStyle,
       borderWidthMm,
-      productCategory: product.category,
+      productCategory: objectType,
     });
   }, [
     borderStyle,
@@ -377,7 +500,7 @@ export function EmbroideryConfigurator({
     heightInches,
     letteringText,
     mappings.length,
-    product.category,
+    objectType,
     quantity,
     threadWeight,
     widthInches,
@@ -430,17 +553,17 @@ export function EmbroideryConfigurator({
       setArtwork({ file, ...loaded });
       setDesignName(file.name.replace(/\.[^.]+$/, ""));
       const aspect = loaded.naturalWidth / loaded.naturalHeight;
-      const nextWidth = Math.min(3.5, placement?.maxWidthInches ?? 3.5);
+      const nextWidth = Math.min(3.5, DEFAULT_PLACEMENT_MAX_INCHES);
       setWidthInches(nextWidth);
-      setHeightInches(Math.min(nextWidth / aspect, placement?.maxHeightInches ?? 4));
+      setHeightInches(Math.min(nextWidth / aspect, DEFAULT_PLACEMENT_MAX_INCHES));
     } catch {
       setError("We could not read that artwork file. Try exporting it again as PNG or SVG.");
       setProcessing(false);
     }
-  }, [placement]);
+  }, []);
 
   function updateMapping(sequence: number, key: string) {
-    const thread = catalog.threads.find((item) => threadKey(item) === key);
+    const thread = threadChoicesForMode.find((item) => threadKey(item) === key);
     if (!thread) return;
     setMappings((current) => current.map((mapping) => mapping.sequence === sequence ? {
       ...mapping,
@@ -452,24 +575,24 @@ export function EmbroideryConfigurator({
   }
 
   function updateWidth(value: number) {
-    const next = Math.max(0.25, Math.min(value, placement?.maxWidthInches ?? 15));
+    const next = Math.max(0.25, Math.min(value, 15));
     setWidthInches(next);
-    if (aspectLocked) setHeightInches(Math.max(0.25, Math.min(next / sourceAspect, placement?.maxHeightInches ?? 15)));
+    if (aspectLocked) setHeightInches(Math.max(0.25, Math.min(next / sourceAspect, 15)));
   }
 
   function updateHeight(value: number) {
-    const next = Math.max(0.25, Math.min(value, placement?.maxHeightInches ?? 15));
+    const next = Math.max(0.25, Math.min(value, 15));
     setHeightInches(next);
-    if (aspectLocked) setWidthInches(Math.max(0.25, Math.min(next * sourceAspect, placement?.maxWidthInches ?? 15)));
+    if (aspectLocked) setWidthInches(Math.max(0.25, Math.min(next * sourceAspect, 15)));
   }
 
   function canContinue() {
-    if (activeStep === 0 && (!product || quantity < 1)) return "Choose a product and quantity to continue.";
+    if (activeStep === 0 && quantity < 1) return "Set a quantity to continue.";
     if (activeStep === 0 && designMode === "ARTWORK" && !artwork) return "Upload artwork to continue.";
     if (activeStep === 0 && designMode === "LETTERING" && !letteringText.trim()) return "Enter the custom lettering text to continue.";
     if (activeStep === 0 && !designName.trim()) return "Give this design a name.";
     if (activeStep === 1 && mappings.length === 0) return "Choose at least one production color.";
-    if (activeStep === 2 && (!product || !placement)) return "Choose a product and placement.";
+    if (activeStep === 2 && !placementName.trim()) return "Describe where the design should be placed.";
     return null;
   }
 
@@ -508,7 +631,11 @@ export function EmbroideryConfigurator({
 
     try {
       const activeArtwork = designMode === "LETTERING"
-        ? await renderLetteringArtwork(letteringText.trim(), mappings[0]?.targetHex ?? "#1A1A1A")
+        ? await renderLetteringArtwork(
+            letteringText.trim(),
+            letteringFontOption(letteringFont).cssFont,
+            mappings.map((mapping) => mapping.targetHex)
+          )
         : artwork!;
       if (designMode === "LETTERING") setArtwork(activeArtwork);
 
@@ -552,11 +679,11 @@ export function EmbroideryConfigurator({
             designMode,
             lettering: designMode === "LETTERING" ? { text: letteringText.trim() } : null,
             designName: designName.trim(),
-            productId: product.id,
-            productName: product.name,
-            productCategory: product.category,
-            locationId: placement.id,
-            placementName: placement.name,
+            productId: null,
+            productName: `Customer-supplied ${objectTypeLabel}`,
+            productCategory: objectType,
+            locationId: null,
+            placementName: placementName.trim(),
             garmentColorHex: garmentColor,
             widthInches,
             heightInches,
@@ -627,7 +754,7 @@ export function EmbroideryConfigurator({
         <div className={styles.controls}>
           {activeStep === 0 && (
             <div className={styles.stepPanel}>
-              <StepHeading number="01" title="Choose the order, then add artwork." copy="Establish the product and quantity first so every size limit, placement, and estimate that follows is grounded in the right production setup." />
+              <StepHeading number="01" title="Describe the order, then add your design." copy="Tell us what you're sending in and how many, then upload artwork or enter custom lettering." />
               <div className={styles.startSection}>
                 <div className={styles.startSectionHeading}><span>Design type</span><small>Upload your own artwork, or have a name or monogram lettered</small></div>
                 <fieldset className={styles.choiceGroup}>
@@ -641,29 +768,21 @@ export function EmbroideryConfigurator({
                 </fieldset>
               </div>
               <div className={styles.startSection}>
-                <div className={styles.startSectionHeading}><span>Product</span><small>Select the object you want embroidered</small></div>
-                <div className={styles.productCards} aria-label="Embroidery products">
-                  {catalog.products.map((item) => {
-                    const selected = catalogKey(item) === productKey;
-                    return (
-                      <button
-                        key={catalogKey(item)}
-                        type="button"
-                        className={`${styles.productCard} ${selected ? styles.productCardSelected : ""}`}
-                        onClick={() => setProductKey(catalogKey(item))}
-                        aria-pressed={selected}
-                      >
-                        <span className={styles.productCardVisual}><PackageCheck size={23} /><small>{item.category}</small></span>
-                        <span className={styles.productCardCopy}>
-                          <strong>{item.name}</strong>
-                          <small>{item.material ?? "Studio-selected material"}</small>
-                          <em>From {money(categoryBasePrice(item.category))}</em>
-                        </span>
-                        {selected && <span className={styles.productCheck}><Check size={11} /></span>}
-                      </button>
-                    );
-                  })}
-                </div>
+                <div className={styles.startSectionHeading}><span>Item type</span><small>Every item is currently customer-supplied — send it in, and tell us what kind it is</small></div>
+                <fieldset className={styles.choiceGroup}>
+                  <legend className={styles.visuallyHidden}>Item type</legend>
+                  {OBJECT_TYPES.map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      className={objectType === item.value ? styles.choiceSelected : ""}
+                      onClick={() => setObjectType(item.value)}
+                      aria-pressed={objectType === item.value}
+                    >
+                      <strong>{item.label}</strong>
+                    </button>
+                  ))}
+                </fieldset>
               </div>
               <div className={styles.startSection}>
                 <div className={styles.startSectionHeading}><span>Quantity</span><small>Volume pricing updates immediately</small></div>
@@ -738,6 +857,22 @@ export function EmbroideryConfigurator({
                       maxLength={60}
                     />
                   </label>
+                  <fieldset className={styles.choiceGroup}>
+                    <legend>Font</legend>
+                    {LETTERING_FONTS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={letteringFont === option.value ? styles.choiceSelected : ""}
+                        onClick={() => setLetteringFont(option.value)}
+                        aria-pressed={letteringFont === option.value}
+                        style={{ fontFamily: option.cssFont }}
+                      >
+                        <strong style={{ fontFamily: option.cssFont }}>Aa</strong>
+                        <small>{option.label}</small>
+                      </button>
+                    ))}
+                  </fieldset>
                   <div className={styles.analysisLine}>
                     <Sparkles size={14} /> {countLetteringCharacters(letteringText)} billable character{countLetteringCharacters(letteringText) === 1 ? "" : "s"} · spaces are free
                   </div>
@@ -763,7 +898,7 @@ export function EmbroideryConfigurator({
                 number="02"
                 title="Translate color into thread."
                 copy={designMode === "LETTERING"
-                  ? "One thread color is included in the per-letter rate. Add spools for a two-tone or outlined treatment — each additional color adds a surcharge to the lettering price."
+                  ? "One thread color is included in the per-letter rate. Pick more to cycle colors letter-by-letter — each additional color adds a surcharge to the lettering price."
                   : "We’ve matched the dominant artwork colors to the studio palette. Change any spool, then tune weight, density and edge finish."}
               />
               <div className={styles.colorCountRow}>
@@ -782,6 +917,13 @@ export function EmbroideryConfigurator({
                   ))}
                 </div>
               </div>
+              {designMode === "LETTERING" && (
+                <small className={styles.fieldHint}>
+                  {catalog.loadedThreads.length > 0
+                    ? "Showing colors currently threaded on the studio machine."
+                    : "No machine is reporting loaded colors right now — showing the full studio palette."}
+                </small>
+              )}
               <div className={styles.mappingList}>
                 {mappings.map((mapping) => (
                   <div className={styles.mappingRow} key={mapping.sequence}>
@@ -795,8 +937,8 @@ export function EmbroideryConfigurator({
                     <span className={styles.threadSwatch} style={{ backgroundColor: mapping.targetHex }} />
                     <label>
                       <span className={styles.visuallyHidden}>Thread for color {mapping.sequence}</span>
-                      <select value={threadKey(threadForMapping(mapping, catalog.threads))} onChange={(event) => updateMapping(mapping.sequence, event.target.value)}>
-                        {catalog.threads.map((thread) => <option key={threadKey(thread)} value={threadKey(thread)}>{thread.name} · {thread.manufacturerCode}</option>)}
+                      <select value={threadKey(threadForMapping(mapping, threadChoicesForMode))} onChange={(event) => updateMapping(mapping.sequence, event.target.value)}>
+                        {threadChoicesForMode.map((thread) => <option key={threadKey(thread)} value={threadKey(thread)}>{thread.name} · {thread.manufacturerCode}</option>)}
                       </select>
                       <ChevronDown size={13} aria-hidden />
                     </label>
@@ -851,18 +993,25 @@ export function EmbroideryConfigurator({
 
           {activeStep === 2 && (
             <div className={styles.stepPanel}>
-              <StepHeading number="03" title="Set scale and placement." copy="Position the artwork on the product chosen in step one. Placement limits come from the live StitchOS product catalog and production setups." />
+              <StepHeading number="03" title="Set scale and placement." copy="Describe where on your item the design should go, then size and position it. The studio confirms exact feasibility once your item arrives." />
               <div className={styles.productRecap}>
-                <span><PackageCheck size={18} /><span><small>Selected product</small><strong>{product.name}</strong></span></span>
+                <span><PackageCheck size={18} /><span><small>Item type</small><strong>{objectTypeLabel}</strong></span></span>
                 <span><small>Order quantity</small><strong>{quantity} units</strong></span>
                 <button type="button" onClick={() => { setError(null); setActiveStep(0); }}>Change</button>
               </div>
-              <label className={styles.field}><span>Placement</span><select value={placementKey} onChange={(event) => setPlacementKey(event.target.value)}>{product.placements.map((item) => <option key={catalogKey(item)} value={catalogKey(item)}>{item.name}</option>)}</select></label>
-              <div className={styles.catalogNote}><span>{product.material}</span><span>Maximum {placement.maxWidthInches} × {placement.maxHeightInches} in</span></div>
+              <label className={styles.field}>
+                <span>Placement</span>
+                <input
+                  value={placementName}
+                  onChange={(event) => setPlacementName(event.target.value)}
+                  placeholder="Left chest, full back, sleeve…"
+                  maxLength={160}
+                />
+              </label>
               <div className={styles.sizeGrid}>
-                <label className={styles.field}><span>Width (in)</span><input type="number" min="0.25" max={placement.maxWidthInches} step="0.05" value={Number(widthInches.toFixed(2))} onChange={(event) => updateWidth(Number(event.target.value))} /></label>
+                <label className={styles.field}><span>Width (in)</span><input type="number" min="0.25" max={15} step="0.05" value={Number(widthInches.toFixed(2))} onChange={(event) => updateWidth(Number(event.target.value))} /></label>
                 <button type="button" className={`${styles.aspectButton} ${aspectLocked ? styles.aspectLocked : ""}`} onClick={() => setAspectLocked((locked) => !locked)} title="Lock artwork aspect ratio" aria-pressed={aspectLocked}><Lock size={14} /><span>{aspectLocked ? "Locked" : "Free"}</span></button>
-                <label className={styles.field}><span>Height (in)</span><input type="number" min="0.25" max={placement.maxHeightInches} step="0.05" value={Number(heightInches.toFixed(2))} onChange={(event) => updateHeight(Number(event.target.value))} /></label>
+                <label className={styles.field}><span>Height (in)</span><input type="number" min="0.25" max={15} step="0.05" value={Number(heightInches.toFixed(2))} onChange={(event) => updateHeight(Number(event.target.value))} /></label>
               </div>
               <div className={styles.placementSliders}>
                 <label className={styles.rangeField}><span>Horizontal placement <strong>{positionX > 0 ? "+" : ""}{positionX.toFixed(2)}</strong></span><input type="range" min="-1" max="1" step="0.01" value={positionX} onChange={(event) => setPositionX(Number(event.target.value))} /></label>
@@ -870,7 +1019,7 @@ export function EmbroideryConfigurator({
                 <label className={styles.rangeField}><span>Rotation <strong>{rotationDegrees}°</strong></span><input type="range" min="-20" max="20" step="1" value={rotationDegrees} onChange={(event) => setRotationDegrees(Number(event.target.value))} /></label>
               </div>
               <div className={styles.inlineFields}>
-                <label className={styles.colorField}><span>Material color</span><input type="color" value={garmentColor} onChange={(event) => setGarmentColor(event.target.value.toUpperCase())} /><code>{garmentColor}</code></label>
+                <label className={styles.colorField}><span>Item color</span><input type="color" value={garmentColor} onChange={(event) => setGarmentColor(event.target.value.toUpperCase())} /><code>{garmentColor}</code></label>
                 <button type="button" className={styles.resetButton} onClick={() => { setPositionX(-0.32); setPositionY(0.22); setRotationDegrees(0); }}><RotateCcw size={14} /> Reset placement</button>
               </div>
             </div>
@@ -878,7 +1027,7 @@ export function EmbroideryConfigurator({
 
           {activeStep === 3 && (
             <div className={styles.stepPanel}>
-              <StepHeading number="04" title="Prepare the studio request." copy={`Review the ${product.name} order for ${quantity} units, then add the contact who will receive proofs and secure order updates. No payment is taken here.`} />
+              <StepHeading number="04" title="Prepare the studio request." copy={`Review the ${objectTypeLabel.toLowerCase()} order for ${quantity} units, then add the contact who will receive proofs and secure order updates. No payment is taken here.`} />
               {designMode === "LETTERING" && (
                 <div className={styles.analysisLine}>
                   <Sparkles size={14} /> Custom lettering: “{letteringText.trim()}” · {countLetteringCharacters(letteringText)} letters · {mappings.length} color{mappings.length === 1 ? "" : "s"}
@@ -925,7 +1074,7 @@ export function EmbroideryConfigurator({
                 normalTextureUrl={textureMaps?.normalUrl ?? null}
                 stitchLayers={textureMaps?.stitchLayers ?? EMPTY_STITCH_LAYERS}
                 garmentColor={garmentColor}
-                productCategory={product.category}
+                productCategory={objectType}
                 widthInches={widthInches}
                 heightInches={heightInches}
                 positionX={positionX}
@@ -942,7 +1091,7 @@ export function EmbroideryConfigurator({
                   {processing ? <LoaderCircle className={styles.spinner} size={22} /> : <Maximize2 size={22} />}
                   <span>
                     {designMode === "LETTERING"
-                      ? "The studio sends a digitized lettering proof after review"
+                      ? processing ? "Stitching your lettering…" : "Type your lettering to see a live thread proof"
                       : processing ? "Translating artwork into thread…" : "Your thread proof will appear here"}
                   </span>
                 </div>
@@ -955,8 +1104,8 @@ export function EmbroideryConfigurator({
               <span className={styles.previewHint}>Drag to rotate · scroll or use controls to zoom</span>
             </div>
             <div className={styles.proofMeta}>
-              <div><span>Object</span><strong>{product.name}</strong></div>
-              <div><span>Placement</span><strong>{placement.name}</strong></div>
+              <div><span>Item</span><strong>{objectTypeLabel}</strong></div>
+              <div><span>Placement</span><strong>{placementName.trim() || "—"}</strong></div>
               <div><span>Finished size</span><strong>{widthInches.toFixed(2)} × {heightInches.toFixed(2)} in</strong></div>
               <div>
                 <span>Thread construction</span>
