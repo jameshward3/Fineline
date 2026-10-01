@@ -354,7 +354,7 @@ export function EmbroideryConfigurator({
   const [positionY, setPositionY] = useState(0.22);
   const [rotationDegrees, setRotationDegrees] = useState(0);
   const [previewZoom, setPreviewZoom] = useState(1);
-  const [quantity, setQuantity] = useState(12);
+  const [quantity, setQuantity] = useState(1);
   const [projectType, setProjectType] = useState<"PERSONAL" | "CORPORATE" | "INSTITUTIONAL" | "OTHER">("PERSONAL");
   const [customer, setCustomer] = useState({ name: "", email: "", phone: "", organization: "", notes: "", consent: false });
   const [website, setWebsite] = useState("");
