@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { primaryNav, utilityNav } from "@/lib/marketing/content";
 import { LogoLockup } from "@/components/story/marks";
+import { primaryNav, utilityNav } from "@/lib/marketing/content";
 
 export function SiteFooter() {
   return (

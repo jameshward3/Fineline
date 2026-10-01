@@ -12,12 +12,8 @@ export const brand = {
   productSubtitle: "Artwork-to-Embroidery Production System",
   tagline: "Imagined luxury, actualized.",
 
-  // Horizontal lockup (light ink, transparent) — dark chrome: sidebar, topbar.
   logo: "/branding/logo.svg",
-  // Icon-only mark (light ink, transparent) — compact contexts on dark chrome.
   logoMark: "/branding/mark.svg",
-  // Full vertical badge lockup (dark ink on cream) — light/print contexts:
-  // login screen, PDF production sheets, export document headers.
   logoBadge: "/branding/logo-badge.svg",
   favicon: "/branding/favicon.svg",
 

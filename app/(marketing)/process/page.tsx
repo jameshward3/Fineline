@@ -53,7 +53,7 @@ export default function ProcessPage() {
         <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 px-5 py-16 text-center sm:px-8">
           <h2 className="font-serif text-2xl text-fl-paper sm:text-3xl">Ready to begin?</h2>
           <Link
-            href="/start"
+            href="/configure"
             className="border border-fl-champagne px-8 py-3.5 font-sans text-xs uppercase tracking-[0.24em] text-fl-champagne transition-colors hover:bg-fl-champagne hover:text-fl-charcoal"
           >
             Start Your Journey

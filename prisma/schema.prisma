@@ -17,18 +17,19 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users            User[]
-  clients          Client[]
-  designs          Design[]
-  threadColors     ThreadColor[]
-  manufacturers    ThreadManufacturer[]
-  companyPalette   CompanyPalette?
-  machines         Machine[]
-  products         Product[]
-  productionSetups ProductionSetup[]
-  jobs             Job[]
-  tags             Tag[]
-  opportunities    Opportunity[]
+  users                   User[]
+  clients                 Client[]
+  designs                 Design[]
+  threadColors            ThreadColor[]
+  manufacturers           ThreadManufacturer[]
+  companyPalette          CompanyPalette?
+  machines                Machine[]
+  products                Product[]
+  productionSetups        ProductionSetup[]
+  jobs                    Job[]
+  tags                    Tag[]
+  opportunities           Opportunity[]
+  configuratorSubmissions ConfiguratorSubmission[]
 }
 
 enum UserRole {
@@ -91,14 +92,17 @@ model Client {
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
 
-  designs          Design[]
-  jobs             Job[]
-  contacts         Contact[]
-  programs         Program[]
-  opportunities    Opportunity[]
-  samples          Sample[]
-  monogramProfiles MonogramProfile[]
-  portalNotes      Note[]            @relation("NoteAuthorClient")
+  designs                 Design[]
+  jobs                    Job[]
+  contacts                Contact[]
+  programs                Program[]
+  opportunities           Opportunity[]
+  samples                 Sample[]
+  monogramProfiles        MonogramProfile[]
+  portalNotes             Note[]                         @relation("NoteAuthorClient")
+  configuratorSubmissions ConfiguratorSubmission[]
+  portalSessions          CustomerPortalSession[]
+  portalLoginChallenges   CustomerPortalLoginChallenge[]
 }
 
 // ---------------------------------------------------------------------------
@@ -151,11 +155,12 @@ model Design {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  versions            DesignVersion[]
-  productAssociations DesignProductSetup[]
-  tags                TagsOnDesigns[]
-  jobItems            JobItem[]
-  programItems        ProgramProduct[]
+  versions               DesignVersion[]
+  productAssociations    DesignProductSetup[]
+  tags                   TagsOnDesigns[]
+  jobItems               JobItem[]
+  programItems           ProgramProduct[]
+  configuratorSubmission ConfiguratorSubmission?
 
   @@index([organizationId, name])
 }
@@ -198,14 +203,15 @@ model DesignVersion {
   sourceAssetId String?
   sourceAsset   ArtworkAsset? @relation("VersionSourceAsset", fields: [sourceAssetId], references: [id])
 
-  assets              ArtworkAsset[]       @relation("VersionAssets")
-  colorMappings       DesignColorMapping[]
-  vectorObjects       VectorObject[]
-  productAssociations DesignProductSetup[]
-  jobItems            JobItem[]
-  exports             Export[]
-  productionRuns      ProductionRun[]
-  approvalRequests    ApprovalRequest[]
+  assets                 ArtworkAsset[]          @relation("VersionAssets")
+  colorMappings          DesignColorMapping[]
+  vectorObjects          VectorObject[]
+  productAssociations    DesignProductSetup[]
+  jobItems               JobItem[]
+  exports                Export[]
+  productionRuns         ProductionRun[]
+  approvalRequests       ApprovalRequest[]
+  configuratorSubmission ConfiguratorSubmission?
 
   @@unique([designId, versionNumber])
 }
@@ -530,10 +536,11 @@ model Job {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  items          JobItem[]
-  tags           TagsOnJobs[]
-  exports        Export[]
-  productionRuns ProductionRun[]
+  items                  JobItem[]
+  tags                   TagsOnJobs[]
+  exports                Export[]
+  productionRuns         ProductionRun[]
+  configuratorSubmission ConfiguratorSubmission?
 }
 
 model JobItem {
@@ -776,6 +783,88 @@ model Opportunity {
   nextActionDate DateTime?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
+
+  configuratorSubmission ConfiguratorSubmission?
+}
+
+// ---------------------------------------------------------------------------
+// Public embroidery configurator intake
+// ---------------------------------------------------------------------------
+
+enum ConfiguratorSubmissionStatus {
+  SUBMITTED
+  REVIEWED
+  QUOTED
+  CONVERTED
+  CANCELLED
+}
+
+/// Immutable-at-intake snapshot of the choices and server-calculated estimate
+/// submitted through the public configurator. Relations connect that snapshot
+/// to the operational CRM records created in the same transaction.
+model ConfiguratorSubmission {
+  id              String                       @id @default(cuid())
+  organizationId  String
+  organization    Organization                 @relation(fields: [organizationId], references: [id])
+  clientId        String
+  client          Client                       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  designId        String
+  design          Design                       @relation(fields: [designId], references: [id], onDelete: Cascade)
+  designVersionId String
+  designVersion   DesignVersion                @relation(fields: [designVersionId], references: [id], onDelete: Cascade)
+  opportunityId   String                       @unique
+  opportunity     Opportunity                  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  jobId           String                       @unique
+  job             Job                          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  idempotencyKey  String                       @unique
+  source          String                       @default("fineligne.co/configure")
+  status          ConfiguratorSubmissionStatus @default(SUBMITTED)
+  projectType     String
+  configuration   Json
+  pricing         Json
+  artwork         Json
+  customerMessage String?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  @@unique([designId])
+  @@unique([designVersionId])
+  @@index([organizationId, createdAt])
+  @@index([clientId, createdAt])
+}
+
+/// Rate-limited phone access attempt linked to a customer portal session.
+/// Retains the original table name for migration compatibility.
+model CustomerPortalLoginChallenge {
+  id              String    @id @default(cuid())
+  clientId        String?
+  client          Client?   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  phoneHash       String
+  ipHash          String
+  returnReference String?
+  attempts        Int       @default(0)
+  expiresAt       DateTime
+  verifiedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([phoneHash, createdAt])
+  @@index([ipHash, createdAt])
+  @@index([expiresAt])
+}
+
+/// Revocable customer portal session. Only a SHA-256 digest is persisted;
+/// the bearer token itself remains in an HTTP-only cookie.
+model CustomerPortalSession {
+  id         String   @id @default(cuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([clientId, expiresAt])
+  @@index([expiresAt])
 }
 
 enum SampleStatus {

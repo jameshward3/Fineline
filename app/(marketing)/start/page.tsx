@@ -48,7 +48,7 @@ export default function StartPage() {
             Bring us an idea. We&rsquo;ll help make it real.
           </p>
           <p className="font-sans text-xs text-fl-ink-faint">
-            Already have an account? <Link href="/portal" className="underline decoration-fl-ink-faint underline-offset-4 hover:text-fl-charcoal">Visit the Client Portal</Link>.
+            Already have an account? <Link href="/orders/sign-in" className="underline decoration-fl-ink-faint underline-offset-4 hover:text-fl-charcoal">Visit the Client Portal</Link>.
           </p>
         </div>
       </section>

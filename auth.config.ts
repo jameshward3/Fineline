@@ -7,6 +7,9 @@ import type { NextAuthConfig } from "next-auth";
  * and is only used by route handlers and server components.
  */
 export const authConfig = {
+  secret:
+    process.env.AUTH_SECRET
+    ?? (process.env.NODE_ENV !== "production" ? "fine-line-local-auth-only" : undefined),
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   trustHost: true,
