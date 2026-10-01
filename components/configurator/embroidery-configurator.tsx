@@ -145,9 +145,20 @@ function mappingsFor(palette: PaletteEntry[], threads: PublicThreadColor[]): Con
 /** Custom lettering has no analyzed artwork colors to map from — the customer
  * picks the thread count and spools directly. sourceHex mirrors targetHex
  * since there is no "detected" color to translate from. */
+function isBlackThread(thread: PublicThreadColor) {
+  return thread.hex.toUpperCase() === "#1A1A1A" || thread.name.trim().toLowerCase() === "black";
+}
+
+/** Black is the standard default lettering thread — put it first (if the
+ * available palette has one) so a single-color order defaults to black
+ * instead of whatever happens to sort first. */
 function letteringMappingsFor(count: number, threads: PublicThreadColor[]): ConfiguratorThreadMapping[] {
+  const blackIndex = threads.findIndex(isBlackThread);
+  const ordered = blackIndex > 0
+    ? [threads[blackIndex], ...threads.filter((_, index) => index !== blackIndex)]
+    : threads;
   return Array.from({ length: count }, (_, index) => {
-    const thread = threads[index % Math.max(1, threads.length)];
+    const thread = ordered[index % Math.max(1, ordered.length)];
     const hex = thread?.hex ?? "#1A1A1A";
     return {
       sequence: index + 1,
